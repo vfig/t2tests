@@ -1,0 +1,40 @@
+*********************************************************************
+
+Description of remote camera overlay components:
+
+The designer may specify any number of "smudges" and "chips", that
+get rendered after the 3d scene is rendered, and before the
+inventory graphics.
+
+Smudges are textures, which may be transparent or alpha textures.
+Alpha textures are monochromatic, using just the first 16 palette
+entries to specify alpha level. Each smudge defines an AlphaLevel
+(0 to 1), a color (rgb, 0-1 each), a size scale (xy, 0-1 each),
+a position (xy, 0-1 each), and a rotation angle (in degrees).
+
+Chips are rendered much as the FU raindrops were. They pretend to
+refract light. They are defined by giving their position on the
+screen (xy, 0-1 each), and their profile id, which is a number that
+defines the shape of the chip. The chips are based on a circular
+shape. Profiles 0-7 specify 1/8 wedges of that circle, starting
+at the 12:00 position, and working clockwise. Profiles 9-15 specify
+1/4 wedges, in 1/8 increments; 16-23 specify 1/2 wedges, in 1/8
+increments. Profile 24 is the whole circle. The full circle has a
+diameter of 16 pixels.
+
+
+*********************************************************************
+
+
+This file currently contains examples of smudges and chips. Replace
+'Xmudge' with 'Smudge' and 'Xhip' with 'Chip', to enable the various
+elements.
+*********************************************************************
+
+FrostedInnerSize 0.5
+FrostedOuterSize 2.0
+FrostedPoints 16
+
+FrostedInnerSizeNIA 0.75
+FrostedOuterSizeNIA 0.80
+FrostedPointsNIA 16

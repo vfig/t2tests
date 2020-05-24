@@ -1,0 +1,14 @@
+DML1
+
+// Object Export of "t_fam/WATERHW/vmin (-6742)"
+
+// Note: Reverse links are not exported. Links, receptrons, stims and metaproperties are exported with '++',
+//       which will cause duplicates if the DML is used on an already populated object.
+
+
+// Renderer->Water Texture Color
++ObjProp "t_fam/WATERHW/vmin" "WaterColor"
+{
+	"Color" 0, 0, 0
+	"Alpha" 0.00
+}

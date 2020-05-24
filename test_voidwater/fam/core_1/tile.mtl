@@ -1,0 +1,9 @@
+render_pass
+{
+    // Use the mission-defined envmap as a skybox:
+    texture "env\acid"
+    uv_source PROJECTION
+    uv_mod SPIN 17
+    no_mipmap
+    render_material_only
+}

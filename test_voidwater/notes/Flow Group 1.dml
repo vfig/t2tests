@@ -1,0 +1,28 @@
+DML1
+
+// Object Export of "Flow Group 1 (7)"
+
+// Note: Reverse links are not exported. Links, receptrons, stims and metaproperties are exported with '++',
+//       which will cause duplicates if the DML is used on an already populated object.
+
+
+// Position
++ObjProp "Flow Group 1" "Position"
+{
+	"Location" 0.00, 0.00, 0.00
+	"Heading" 0
+	"Pitch" 0
+	"Bank" 0
+}
+
+// Renderer->Has Refs
++ObjProp "Flow Group 1" "HasRefs"
+{
+	"" FALSE
+}
+
+// Renderer->Water Flow Color Index
++ObjProp "Flow Group 1" "FlowColor"
+{
+	"" 3
+}

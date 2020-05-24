@@ -1,0 +1,1 @@
+This is obsolete! NewDark 1.27+ exposed the Stun service to scripts!

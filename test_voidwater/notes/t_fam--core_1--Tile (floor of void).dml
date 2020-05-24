@@ -1,0 +1,13 @@
+DML1
+
+// Object Export of "t_fam/core_1/Tile (-4456)"
+
+// Note: Reverse links are not exported. Links, receptrons, stims and metaproperties are exported with '++',
+//       which will cause duplicates if the DML is used on an already populated object.
+
+
+// Physics->Terrain->Friction
++ObjProp "t_fam/core_1/Tile" "Friction"
+{
+	"" 0.00
+}

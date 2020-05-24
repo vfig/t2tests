@@ -1,0 +1,35 @@
+render_pass
+{
+    // Use the mission-defined envmap as a skybox:
+    use_location_envtex 2
+    uv_source PROJECTION
+
+    ;; This makes the skybox spin around a vertical axis:
+    uv_mod SPIN 5.0
+
+    ;; This makes the skybox rotate back and forth, around a vertical axis:
+    ;uv_mod ROTATE_WAVE SINE 0 10 0 1000 
+
+    ;; This makes the skybox scale randomly, vertically around the horizon,
+    ;; which is trippy! It also makes the sky feel "flat", but if slow could
+    ;; be used to make "lowering clouds"?
+    ;uv_mod SCALE_WAVE TURB 0.75 0.25 0 1000
+
+    ;; Scrolling doesn't work on a cubemap, apparently.
+    ;uv_mod UOFFSET_WAVE SINE 0 10 0 1000
+
+    no_mipmap 1
+    render_material_only 1
+}
+
+.ifdef 0
+;; Multiple render passes work! With care, and multiple cubemaps, this could be used to
+;; create a spiralling storm in the skybox or something!
+
+render_pass
+{
+    texture "obj\txt16\winbrch.gif"
+    uv_source TEXTURE
+    uv_mod UOFFSET_WAVE SINE 0 0.1 0 1000
+}
+.endif
