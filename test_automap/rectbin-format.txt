@@ -1,0 +1,335 @@
+Automap format details:
+
+NewDark limits:
+    Max decals per page on Thief maps: 256 (from 64)
+    Max pages per mission on Thief maps: 32 (from 8) [where visited area functionality works correctly]
+    New image formats: PNG, DDS, PCX 32-bit, BMP 24/32-bit, BMP RLE, TGA RLE
+    Full 32-bit rendering pipeline support, from 32-bit textures to 32-bit render surfaces.
+
+pages, start at 0 (NNN)
+    regions, start at 0 (MMM)
+
+    pNNNra.bin - page NNN regions
+
+        struct { u16 x0, y0, x1, y1 } [region_count]
+            x0, y0 is inclusive top left pixel coordinate
+            x1, y1 is exclusive bottom right pixel coordinate
+            region_count is inferred; the file needs to have the right amount of data in it.
+
+    pageNNN.pcx / png   - base map, 552x360
+    pNNNrMMM.pcx / png  - region subrect
+        - displayed with a color tint
+
+PNG Regions can have alpha! Pages not so much. (They get composited against pure white)
+
+dark_map_decal_scheme <method> [<method_params>*]
+    (Thief only) select and configure the way visited and current map locations are shaded/colored.
+    Method 0: original, has no params (default)
+    Method 1: dodge/burn, to customize this method supply either 2 params where the first is a monochrome factor
+              for visited areas and the second for current area, or supply 6 parameters where the first 3 is an
+              RGB triplet for visited areas and the last 3 for current area.
+              The param values are floating point values, a positive value works like a Photoshop/GIMP dodge,
+              a negative value like burn. "-0.3 -0.3 1.1  1.3 1.3 0.2" would look similar to the original,
+              default when not supplying any params is "-0.5 0.8"
+    console command: set_map_decal_scheme <method> [<method_params>*]
+
+Commands:
+    page: should always be valid, but 
+    location -1: no specific location
+
+    automap %s              display the automap (arg is ignored)
+    amap_visited %d         mark an automap location on current page visited
+                                -1: all locations on this page
+                                 other: specific location on this page
+    amap_im_everywhere %d   make all decals display as current location
+                                0: off
+                                1: I am everywhere
+                                -1: I have been everywhere
+    amap_spew               toggle: spew automap info (dromed only)
+
+
+==========
+
+Context data:
+
+    Lnull P1 Rnull
+    Lnull P1 R0
+    Lnull P1 R1
+    Lnull P1 R2
+    Lnull P1 R3
+    Lnull P1 R4
+    Lnull P1 R5
+    Lnull P1 R6
+    Lnull P1 R7
+    Lnull P1 R8
+    Lnull P1 R9
+    Lnull P1 R10
+    Lnull P1 R11
+    Litalian P1 Rnull
+    Lgerman P1 Rnull
+    Lfrench P1 Rnull
+    Lrussian P1 Rnull
+    Lenglish P1 Rnull
+
+1. derive # languages
+    for each context with a non-null language, make a note of the language
+        (if none, use default language)
+
+2. derive # pages
+    for each context with a non-null page, make a note of the page number
+        (if none, use page 0)
+
+3. derive # regions per page
+    for each page,
+        for each context with page p and a non-null region, make a note of the region number
+            (if none, no regions to export for this page)
+
+------------
+
+So, make sure all the data looks good.
+
+Show it in a dialog with a TreeView and options to confirm or cancel.
+
+Then use File.saveDlg() or Folder.selectDlg() (probably the former) for the user to select the directory to output to (should be intrface/missXX)
+     (can it remember the previous one used, and use the instance-method File.saveDlg() instead of the class method??) YES! See - https://stackoverflow.com/questions/14388531/saving-per-user-or-per-document-preferences-in-a-photoshop-script
+        > probably good enough just to save as a persistent preference app-wide. Since people won't be
+        > so much using it with different maps, I don't suppose.
+
+
+            const kMyFlag = app.stringIDToTypeID( "myFlag" );
+            const kMyNumber = app.stringIDToTypeID( "myNumber" );
+            const kMySettings = "mySettings";
+
+            function saveSettings()
+            {
+              var desc = new ActionDescriptor();
+              desc.putBoolean(kMyFlag, true);
+              desc.putInteger(kMyNumber, 42);
+
+              // "true" means setting persists across Photoshop launches.
+              app.putCustomOptions( kMySettings, desc, true );
+            }
+
+            function getSettings()
+            {
+              var desc = app.getCustomOptions( kMySettings );
+              return [desc.getBoolean( kMyFlag ), desc.getInteger( kMyNumber )];
+            }
+
+Now, figure out what to export!
+
+    const selection = doc.selection;
+    selection.deselect();
+    selection . ...
+
+    selection.bounds - array of UnitValue ???
+
+
+function SelectTransparency()
+{
+    var idChnl = charIDToTypeID( "Chnl" );
+
+    var actionSelect = new ActionReference();
+    actionSelect.putProperty( idChnl, charIDToTypeID( "fsel" ) );     
+
+    var actionTransparent = new ActionReference();    
+    actionTransparent.putEnumerated( idChnl, idChnl, charIDToTypeID( "Trsp" ) );
+
+    var actionDesc = new ActionDescriptor();
+    actionDesc.putReference( charIDToTypeID( "null" ), actionSelect );
+    actionDesc.putReference( charIDToTypeID( "T   " ), actionTransparent );
+
+    executeAction( charIDToTypeID( "setd" ), actionDesc, DialogModes.NO );
+}
+
+----------
+
+// ===== Get layer ID of activeDocument.activeLayer (set both, I guess!)
+function getLayerID(){
+    var ref = new ActionReference();
+    ref.putEnumerated(charIDToTypeID('Lyr '), charIDToTypeID('Ordn'), charIDToTypeID('Trgt'));
+    return executeActionGet(ref).getInteger(stringIDToTypeID("layerID"));
+};
+
+
+// ==== set selection to nontransparent parts of "Layer 1" (do we maybe need to do this first? or can we just add from an empty selection?)
+var idsetd = charIDToTypeID( "setd" );
+    var desc17 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref14 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idfsel = charIDToTypeID( "fsel" );
+        ref14.putProperty( idChnl, idfsel );
+    desc17.putReference( idnull, ref14 );
+    var idT = charIDToTypeID( "T   " );
+        var ref15 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idTrsp = charIDToTypeID( "Trsp" );
+        ref15.putEnumerated( idChnl, idChnl, idTrsp );
+        var idLyr = charIDToTypeID( "Lyr " );
+        ref15.putName( idLyr, "Layer 1" );                        <--- only by name (bad)
+        ref15.putIdentifier( idLyr, layerID );                  <--- if we can get the layer ID!!
+    desc17.putReference( idT, ref15 );
+executeAction( idsetd, desc17, DialogModes.NO );
+
+// ==== add nontransparent parts of "Layer 1" to selection
+var idAdd = charIDToTypeID( "Add " );
+    var desc20 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref20 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idTrsp = charIDToTypeID( "Trsp" );
+        ref20.putEnumerated( idChnl, idChnl, idTrsp );
+        var idLyr = charIDToTypeID( "Lyr " );
+        ref20.putName( idLyr, "Layer 1" );
+    desc20.putReference( idnull, ref20 );
+    var idT = charIDToTypeID( "T   " );
+        var ref21 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idfsel = charIDToTypeID( "fsel" );
+        ref21.putProperty( idChnl, idfsel );
+    desc20.putReference( idT, ref21 );
+executeAction( idAdd, desc20, DialogModes.NO );
+
+
+>>> So the bullshit above can work to add to the selection the nontransparent parts of any relevant
+>>> layer. The only caveat is that the layer must have a *unique* name. I guess that's a reasonable
+>>> restriction? I can certainly _check_ if it is the case and warn, I suppose.
+
+>>> Then we Copy Merged, create a new document, and paste into there, and save it.
+
+
+function WaitForRedraw() {
+    var eventWait = charIDToTypeID("Wait");
+    var enumRedrawComplete = charIDToTypeID("RdCm");
+    var typeState = charIDToTypeID("Stte");
+    var keyState = charIDToTypeID("Stte");
+    var desc = new ActionDescriptor();
+    desc.putEnumerated(keyState, typeState, enumRedrawComplete);
+    executeAction(eventWait, desc, DialogModes.NO);
+}
+
+
+
+-----------------
+
+Test case: T1 style map, with text baked into every page, and regions adding highlight:
+
+    english
+    german
+    p000
+    p001
+        r000
+        r001
+
+Expected result:
+
+    Filename                Visible layers
+    english/p000.png        english, p000
+    english/p001.png        english, p001
+    english/p001r000.png    english, p001, p001/r000
+    english/p001r001.png    english, p001, p001/r001
+    german/p000.png         german, p000
+    german/p001.png         german, p001
+    german/p001r000.png     german, p001, p001/r000
+    german/p001r001.png     german, p001, p001/r001
+
+
+Test case: T1 style map, with text baked into each page, and regions adding highlight:
+
+    p000
+        english
+        german
+    p001
+        english
+        german
+        r000
+        r001
+    p002
+        r000
+        r001
+
+Expected result:
+
+    Filename                Visible layers
+    p002.png                p002
+    p002r000.png            p002, p002/r000
+    p002r001.png            p002, p002/r001
+    english/p000.png        p000, p000/english
+    english/p001.png        p001, p001/english
+    english/p001r000.png    p001, p001/english, p001/r000
+    english/p001r001.png    p001, p001/english, p001/r001
+    english/p001r002.png    p001, p001/english, p001/r002
+    german/p000.png         p000, p000/german
+    german/p001.png         p001, p001/german
+    german/p001r000.png     p001, p001/german, p001/r000
+    german/p001r001.png     p001, p001/german, p001/r001
+    german/p001r002.png     p001, p001/german, p001/r002
+
+
+Test case: T2 Casing-style map, with text baked into each region:
+
+    p000
+        english
+        german
+    p001
+        r000
+        r001
+            english
+            german
+    p002
+        r000
+        r001
+
+Expected result:
+    Filename                Visible layers
+    p001.png                p001
+    p001r000.png            p001, p001/r000
+    english/p000.png        p000, p000/english
+    english/p001r001.png    p001, p001/r001, p001/r001/english
+    german/p000.png         p000, p000/german
+    german/p001r001.png     p001, p001/r001, p001/r001/german
+
+    english/p001.png        p001, p001/english
+    english/p001r000.png    p001, p001/english, p001/r000
+    english/p001r001.png    p001, p001/english, p001/r001
+    english/p001r002.png    p001, p001/english, p001/r002
+    german/p000.png         p000, p000/german
+    german/p001.png         p001, p001/german
+    german/p001r000.png     p001, p001/german, p001/r000
+    german/p001r001.png     p001, p001/german, p001/r001
+    german/p001r002.png     p001, p001/german, p001/r002
+    p002.png                p002
+    p002r000.png            p002, p002/r000
+    p002r001.png            p002, p002/r001
+
+---------------
+
+Actual result from "automap p001.psd":
+
+    p001
+    p001r000
+    p001r001
+    p001r002
+    p001r003
+    p001r004
+    p001r005
+    p001r006
+    p001r007
+    p001r008
+    p001r009
+    p001r010
+    p001r011
+    italian/p001
+    german/p001
+    french/p001
+    russian/p001
+    english/p001
+
+PROBLEMS!
+1. "p001" sans language should not be here (because there are language-specific variants)
+2. p001r* should all be language-specific!
+    > implication is that if a page is language-specific, all its regions MUST be too.
+3. Aaargh I don't know how to do this.
