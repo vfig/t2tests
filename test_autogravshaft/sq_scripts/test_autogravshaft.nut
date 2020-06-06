@@ -1,6 +1,22 @@
 class AutoGravshaft extends SqRootScript {
     timer = 0;
     previousPitch = 999;
+    particles = 0;
+
+    function OnSim() {
+        if (message().starting) {
+            // Find the linked particles.
+            local links = Link.GetAll("ScriptParams", self);
+            foreach (link in links) {
+                local link_data = LinkTools.LinkGetData(link, "");
+                if (link_data == "Particles") {
+                    particles = LinkDest(link);
+                }
+            }
+            // Start them off in drifting mode.
+            AdjustParticles(0);
+        }
+    }
 
     function OnPlayerRoomEnter() {
         local player = message().MoveObjId;
@@ -32,7 +48,7 @@ class AutoGravshaft extends SqRootScript {
                 vel.x *= 0.2;
                 vel.y *= 0.2;
                 vel.z = 3.0;
-                Property.Set(player, "PhysAttr", "Gravity %", -20.0);
+                Property.Set(player, "PhysAttr", "Gravity %", -15.0);
             } else if (pitch < 0) {
                 // Kick down a little, slow horizontal movement, and low gravity
                 vel.x *= 0.8;
@@ -45,25 +61,40 @@ class AutoGravshaft extends SqRootScript {
                 Property.Set(player, "PhysAttr", "Gravity %", 0.0);
             }
             Physics.SetVelocity(player, vel);
+            AdjustParticles(pitch);
         }
         previousPitch = pitch;
+    }
+
+    function AdjustParticles(pitch) {
+        if (particles == 0) return;
+        local velMin = vector();
+        local velMax = vector();
+        if (pitch > 0) {
+            velMin.z = 10;
+            velMax.z = 15;
+        } else if (pitch < 0) {
+            velMin.z = -15;
+            velMax.z = -10;
+        } else {
+            velMin.z = -0.5;
+            velMax.z = 0.5;
+        }
+        Property.Set(particles, "PGLaunchInfo", "Velocity Min", velMin);
+        Property.Set(particles, "PGLaunchInfo", "Velocity Max", velMax);
     }
 
     function GetCameraPitch(player) {
         local fac = Camera.GetFacing();
         local angle = fac.y;
         if (angle >= 270 && angle < (360.0 - 20.0)) {
-            print("looking up");
             return 1.0;
         } else if (angle > 45.0 && angle <= 90.0) {
-            print("looking down");
             return -1.0;
         } else if (angle > 90.0 && angle < 270.0) {
             // Shouldn't happen, but pretend it's the same as level.
-            print("looking backwards ??!");
             return 0.0;
         } else {
-            print("looking level");
             return 0.0;
         }
     }
@@ -82,12 +113,15 @@ class AutoGravshaft extends SqRootScript {
             timer = 0;
         }
         previousPitch = 999;
+        AdjustParticles(0);
         local player = message().MoveObjId;
         Property.Set(player, "PhysAttr", "Gravity %", 100.0);
         Property.Set(player, "PhysAttr", "Base Friction", 0.0);
     }
 }
 
+
+// ------------------
 
 
 class GravshaftRoom extends SqRootScript {
