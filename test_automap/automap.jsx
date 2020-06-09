@@ -65,6 +65,32 @@ function ProcessAllOpenDocuments() {
             FindContextsInDocument(documents[i], saveContext);
         }
 
+        Log("\n");
+        Log("contexts = [");
+        for (var i=0; i<allContexts.length; ++i) {
+            var c = allContexts[i];
+            var lines = [];
+            lines.push("  {");
+            lines.push("  'document': '" + c.document.name + "',");
+            if (c.page !== null) {
+                lines.push("  'page': " + c.page + ",");
+                lines.push("  'pageSource': '" + c.pageSource.typename + " " + c.pageSource.name + "',");
+            }
+            if (c.region !== null) {
+                lines.push("  'region': " + c.region + ",");
+                lines.push("  'regionSource': '" + c.regionSource.typename + " " + c.regionSource.name + "',");
+            }
+            if (c.language !== null) {
+                lines.push("  'language': '" + c.language + "',");
+                lines.push("  'languageSource': '" + c.languageSource.typename + " " + c.languageSource.name + "',");
+            }
+            lines.push("  },");
+            var msg = lines.join("\n");
+            Log(msg);
+        }
+        Log("]");
+        Log("\n");
+
         const exportPlan = BuildExportPlan(allContexts);
         Log("exportPlan: ");
         for (var k in exportPlan) {
