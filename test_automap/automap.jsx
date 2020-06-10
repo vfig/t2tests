@@ -35,6 +35,12 @@ function Log(message) {
     $.writeln(message);
 }
 
+function LogWarning(message) {
+    $.writeln("WARNING: " + message);
+}
+
+// FIXME: I think all the stuff between here and the next message is irrelevant.
+
 function Context(document) {
     this.document = document;
     this.language = null;
@@ -413,6 +419,8 @@ function BuildExportPlan(allContexts) {
     */
 }
 
+// FIXME: nearly all the stuff above is irrelevant
+
 
 function BuildLanguageRegExp(languages) {
     var pattern = [];
@@ -428,8 +436,8 @@ function BuildLanguageRegExp(languages) {
 }
 
 const LANGUAGE_REGEX = BuildLanguageRegExp(LANGUAGES);
-const PAGE_REGEX = new RegExp("\\bp(?:age)?([0-9]{1,3})\\b", 'i');
-const REGION_REGEX = new RegExp("\\br(?:egion)?([0-9]{1,3})\\b", 'i');
+const PAGE_REGEX = new RegExp("p(?:age)?\\s*([0-9]{1,3})", 'i');
+const REGION_REGEX = new RegExp("r(?:egion)?\\s*([0-9]{1,3})", 'i');
 
 function GetPageFromName(name) {
     var m = name.match(PAGE_REGEX);
@@ -478,7 +486,6 @@ function GetContextFromSourceName(source, name, parentContext) {
         return null;
     }
 }
-
 
 //ProcessAllOpenDocuments();
 function log_recursive(o) {
@@ -533,3 +540,210 @@ try {
     win.close();
 }
 */
+
+////////////////////////////
+
+
+function RelevantLayer(layer, page, region, language) {
+    var b = layer.bounds;
+    this.layer = layer;
+    this.bounds = [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
+    this.page = page;
+    this.region = region;
+    this.language = language;
+    this.originallyVisible = layer.visible;
+}
+
+function FindRelevantLayersRecursive(o, foundRelevantLayerFn, inheritedPage, inheritedLanguage) {
+    var isLayer = (o.typename === 'ArtLayer' || o.typename === 'LayerSet');
+    var hasSublayers = (o.typename === 'Document' || o.typename === 'LayerSet');
+
+    var name = o.name;
+    var page = GetPageFromName(name);
+    var region = GetRegionFromName(name);
+    var language = GetLanguageFromName(name);
+    var isRelevant = isLayer && (page !== null || region !== null || language !== null);
+    if (region !== null && (page === null && inheritedPage === null)) {
+        LogWarning("Warning: layer '" + name + "' has a region but I can't figure out a page number! Ignoring it.");
+        isRelevant = false;
+    }
+
+    var resolvedPage = (page !== null ? page : inheritedPage);
+    // FIXME: do we need an inheritedRegion, e.g. in case of language sublayers of a region?
+    var resolvedRegion = region;
+    var resolvedLanguage = (language !== null ? language : inheritedLanguage);
+
+    if (isRelevant) {
+        foundRelevantLayerFn(new RelevantLayer(o, resolvedPage, resolvedRegion, resolvedLanguage));
+    } else {
+        Log("not relevant: '" + name + "' isLayer:" + isLayer + " page:" + page + " region:" + region + " language:" + language);
+    }
+    if (hasSublayers) {
+        var sublayers = o.layers;
+        for (var i=0; i<sublayers.length; ++i) {
+            FindRelevantLayersRecursive(sublayers[i], foundRelevantLayerFn, resolvedPage, resolvedLanguage);
+        }
+    }
+}
+
+function FindRelevantLayers(doc) {
+    var relevantLayers = [];
+    var found = function(rl) {
+        relevantLayers.push(rl);
+    }
+    // FIXME: if we want to force a default language, can pass it in here as 'inheritedLanguage'
+    FindRelevantLayersRecursive(doc, found, null, null);
+    return relevantLayers;
+}
+
+function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
+    var pageLayers = [];
+    var regionLayers = [];
+    var languageLayers = [];
+    for (var i=0; i<relevantLayers.length; ++i) {
+        var rl = relevantLayers[i];
+        if (rl.page === p && rl.region !== null) {
+            regionLayers.push(rl);
+        } else if (rl.page === p && rl.region === null) {
+            pageLayers.push(rl);
+        } else if (rl.page === null && rl.language !== null) {
+            languageLayers.append(rl);
+        }
+    }
+    // If there's nothing specific to this page, we're not going to export it!
+    if (pageLayers.length == 0) return;
+
+    // Figure out the languages in use for this page.
+    var isLanguageUsed = {};
+    for (var i=0; i<LANGUAGES.length; ++i) {
+        var language = LANGUAGES[i];
+        isLanguageUsed[language] = false;
+    }
+    for (var i=0; i<pageLayers.length; ++i) {
+        var language = pageLayers[i].language;
+        if (language !== null) {
+            isLanguageUsed[language] = true;
+        }
+    }
+    for (var i=0; i<regionLayers.length; ++i) {
+        var language = regionLayers[i].language;
+        if (language !== null) {
+            isLanguageUsed[language] = true;
+        }
+    }
+    for (var i=0; i<languageLayers.length; ++i) {
+        var language = languageLayers[i].language;
+        if (language !== null) {
+            isLanguageUsed[language] = true;
+        }
+    }
+    var usedLanguages = [];
+    for (var i=0; i<LANGUAGES.length; ++i) {
+        var language = LANGUAGES[i];
+        if (isLanguageUsed[language]) {
+            usedLanguages.push(language);
+        }
+    }
+    // If any langs are used, then (for simplicity) assume they are used for all
+    // assets in this page. So we reprocess the page and region lists, expanding
+    // each for all langs.
+    if (usedLanguages.length > 0) {
+        var expandedPageLayers = [];
+        for (var i=0; i<pageLayers.length; ++i) {
+            var rl = pageLayers[i];
+            if (rl.language !== null) {
+                expandedPageLayers.push(rl);
+            } else {
+                for (var j=0; j<usedLanguages.length; ++j) {
+                    var nrl = new RelevantLayer(rl.layer, rl.page, rl.region, usedLanguages[j]);
+                    expandedPageLayers.push(nrl);
+                }
+            }
+        }
+        pageLayers = expandedPageLayers;
+        var expandedRegionLayers = [];
+        for (var i=0; i<regionLayers.length; ++i) {
+            var rl = regionLayers[i];
+            if (rl.language !== null) {
+                expandedRegionLayers.push(rl);
+            } else {
+                for (var j=0; j<usedLanguages.length; ++j) {
+                    var nrl = new RelevantLayer(rl.layer, rl.page, rl.region, usedLanguages[j]);
+                    expandedRegionLayers.push(nrl);
+                }
+            }
+        }
+        regionLayers = expandedRegionLayers;
+    }
+    // So now the lists are ready to use.
+    // Sort them for convenience of output:
+    var compareRelevantLayers = function (a, b) {
+        var n;
+        if (a.language === null) return -1;
+        if (b.language === null) return 1;
+        n = a.language.localeCompare(b.language);
+        if (n != 0) return n;
+        if (a.page === null) return -1;
+        if (b.page === null) return 1;
+        if (a.page < b.page) return -1;
+        if (a.page > b.page) return 1;
+        if (a.region === null) return -1;
+        if (b.region === null) return 1;
+        if (a.region < b.region) return -1;
+        if (a.region > b.region) return 1;
+        return a.layer.name.localeCompare(b.layer.name);
+    }
+    pageLayers.sort(compareRelevantLayers);
+    regionLayers.sort(compareRelevantLayers);
+
+    // Print stuff, see where we're at...
+    Log("after expansion:");
+    for (var i=0; i<pageLayers.length; ++i) {
+        var rl = pageLayers[i];
+        Log("page " + rl.page + ", region " + rl.region + ", language " + rl.language + " : " + rl.layer.name);
+    }
+    for (var i=0; i<regionLayers.length; ++i) {
+        var rl = regionLayers[i];
+        Log("page " + rl.page + ", region " + rl.region + ", language " + rl.language + " : " + rl.layer.name);
+    }
+/*
+      for lang in [None] + ALL_LANGUAGES:
+        layers = [o['layer'] for o in pageLayers if o['lang'] == lang]
+        if lang is None:
+          filename = f"page{page:03}"
+        else:
+          filename = f"{lang}/page{page:03}"
+        if not layers: continue
+        define_asset(filename, layers)
+        for r in range(MAX_REGIONS):
+          layers = [o['layer'] for o in regionLayers if o['region'] == r and o['lang'] == lang]
+          if not layers: continue
+          if lang is None:
+            filename = f"p{page:03}r{r:03}"
+          else:
+            filename = f"{lang}/p{page:03}r{r:03}"
+          define_asset(filename, layers)
+*/
+}
+
+// FIXME: temp
+var relevantLayers = FindRelevantLayers(activeDocument);
+for (var i=0; i<relevantLayers.length; ++i) {
+    var rl = relevantLayers[i];
+    Log(rl.layer.typename + " " + rl.layer.name + ": p" + rl.page + " r" + rl.region + " l" + rl.language);
+}
+Log("--------------------");
+
+/*
+  all_assets = []
+  def define_asset(filename, layers):
+    all_assets.append({'filename': filename, 'layers': layers})
+  for p in range(MAX_PAGES):
+    build_page_assets(p, all_interesting_objects, define_asset)
+*/
+function DefineAsset(filename, layers) {
+    // todo
+}
+for (var p=0; p<MODE.MAX_PAGES; ++p) {
+    BuildAssetsForPage(p, relevantLayers, DefineAsset);
+}

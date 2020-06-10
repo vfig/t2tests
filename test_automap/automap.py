@@ -124,6 +124,8 @@ def process_contexts(contexts):
   # existing extents (the extents will be language-specific too if any of the regions are)
 
 
+## all the stuff above here can be disregarded, right?
+
 MAX_PAGES = 32
 MAX_REGIONS = 256
 ALL_LANGUAGES = ['english', 'french', 'german', 'spanish', 'russian', 'italian']
