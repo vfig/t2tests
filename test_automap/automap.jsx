@@ -1,7 +1,13 @@
-#script "Export Automap"
+﻿#script "Export Automap"
 #target photoshop
 #strict on
 
+/** This script will only look for these exact language names
+ *  when figuring out which languages to export for. If you
+ *  need to support additional languages, just add them to
+ *  this list. Make sure the language name here is exactly the
+ *  same as the folder name used by the game for the language.
+ */
 const LANGUAGES = [
     "english",
     "french",
@@ -11,12 +17,19 @@ const LANGUAGES = [
     "spanish",
 ];
 
-const MAX_PAGES_OLDDARK = 8;
-const MAX_PAGES_NEWDARK = 32;
-const MAX_REGIONS_OLDDARK = 64;
-const MAX_REGIONS_NEWDARK = 256;
-const MAX_PAGES = Math.max(MAX_PAGES_OLDDARK, MAX_PAGES_NEWDARK);
-const MAX_REGIONS = Math.max(MAX_REGIONS_OLDDARK, MAX_REGIONS_NEWDARK);
+const MODES = {
+    OLDDARK: {
+        MAX_PAGES: 8,
+        MAX_REGIONS: 64,
+    },
+    NEWDARK: {
+        MAX_PAGES: 32,
+        MAX_REGIONS: 256,
+    },
+};
+
+// TODO: support choosing which mode we operate in.
+const MODE = MODES.NEWDARK;
 
 function Log(message) {
     $.writeln(message);
@@ -307,9 +320,9 @@ function DeriveFileKey(language, page, region) {
 function BuildExportPlan(allContexts) {
     // Find out which pages and regions are in use.
     var pageIndex = [];
-    for (var p=0; p<MAX_PAGES; ++p) {
+    for (var p=0; p<MODE.MAX_PAGES; ++p) {
         var regionIndex = [];
-        for (var r=0; r<MAX_REGIONS; ++r) {
+        for (var r=0; r<MODE.MAX_REGIONS; ++r) {
             regionIndex[r] = {
                 'used': false,
             };
@@ -368,12 +381,12 @@ function BuildExportPlan(allContexts) {
     // Second pass: allocate contexts for every page, to every page and every region that is in use.
     for (var i=0; i<everyPageContexts.length; ++i) {
         var context = everyPageContexts[i];
-        for (var p=0; p<MAX_PAGES; ++p) {
+        for (var p=0; p<MODE.MAX_PAGES; ++p) {
             if (! pageIndex[p].used) continue;
             var key = DeriveFileKey(context.language, p, null);
             if (key === null) continue;
             assignContextToKey(context, key);
-            for (var r=0; r<MAX_REGIONS; ++r) {
+            for (var r=0; r<MODE.MAX_REGIONS; ++r) {
                 if (! pageIndex[p].regions[r].used) continue;
                 var key = DeriveFileKey(context.language, p, r);
                 if (key === null) continue;
@@ -467,4 +480,56 @@ function GetContextFromSourceName(source, name, parentContext) {
 }
 
 
-ProcessAllOpenDocuments();
+//ProcessAllOpenDocuments();
+function log_recursive(o) {
+    var s = [];
+    var b;
+    var v;
+    if (o.typename == 'Document') {
+        b = [0, 0, o.width.as("px"), o.height.as("px")];
+        v = true;
+    } else {
+        b = [o.bounds[0].as("px"), o.bounds[1].as("px"), o.bounds[2].as("px"), o.bounds[3].as("px")];
+        v = o.visible;
+    }
+    Log(o.name)
+    s.push("{ 'name': '" + o.name + "',");
+    s.push("  'typename': '" + o.typename + "',");
+    s.push("  'visible': " + (v ? 1 : 0) + ",");
+    s.push("  'bounds': [" + b[0] + ", " + b[1] + ", " + b[2] + ", " + b[3] + "],");
+    if (o.typename == 'Document' || o.typename == 'LayerSet') {
+        s.push("  'layers': [");
+        var layers = o.layers;
+        // Note: without these log calls, ps stops responding... ?!?
+        Log(layers.length + " layers");
+        for (var i=0; i<o.layers.length; ++i) {
+            Log(">> " + o.name + " layer: " + i);
+            s.push(log_recursive(o.layers[i]) + ",");
+        }
+        s.push("  ],")
+    }
+    s.push("}");
+    return s.join("\n");
+}
+/* //To dump layers recursively (ready for python)
+Log(log_recursive(activeDocument));
+*/
+
+
+/* //To do a progress bar:
+function WaitForRedraw(){
+    $.sleep(1);
+    app.refresh();
+}
+var win = new Window("window{text:'Progress',bounds:[100,100,400,150],bar:Progressbar{bounds:[20,20,280,31] , value:0,maxvalue:100}};");
+win.show();
+try {
+    for(var i=0; i<10; ++i){
+        Log("tick " + i);
+        win.bar.value = i / 10.0 * 100.0;
+    	WaitForRedraw();	
+    }
+} finally {
+    win.close();
+}
+*/

@@ -144,6 +144,11 @@ function SelectTransparency()
 
 ----------
 
+MAYBE better than all that ActionReference bullshit (which anyway doesn't work on layer groups,
+and needs more bullshit to account for masks):
+    > https://stackoverflow.com/questions/35093886/photoshop-script-how-to-get-the-bounds-of-the-visible-portion-of-a-layer-set
+
+
 // ===== Get layer ID of activeDocument.activeLayer (set both, I guess!)
 function getLayerID(){
     var ref = new ActionReference();
@@ -333,3 +338,48 @@ PROBLEMS!
 2. p001r* should all be language-specific!
     > implication is that if a page is language-specific, all its regions MUST be too.
 3. Aaargh I don't know how to do this.
+
+
+--------
+
+MISC, not important, see further up for the important stuff
+
+Select current layer transparency:
+
+// =======================================================
+var idsetd = charIDToTypeID( "setd" );
+    var desc11 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref11 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idfsel = charIDToTypeID( "fsel" );
+        ref11.putProperty( idChnl, idfsel );
+    desc11.putReference( idnull, ref11 );
+    var idT = charIDToTypeID( "T   " );
+        var ref12 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idTrsp = charIDToTypeID( "Trsp" );
+        ref12.putEnumerated( idChnl, idChnl, idTrsp );
+    desc11.putReference( idT, ref12 );
+executeAction( idsetd, desc11, DialogModes.NO );
+
+Add current layer mask
+
+// =======================================================
+var idAdd = charIDToTypeID( "Add " );
+    var desc12 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref13 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idMsk = charIDToTypeID( "Msk " );
+        ref13.putEnumerated( idChnl, idChnl, idMsk );
+    desc12.putReference( idnull, ref13 );
+    var idT = charIDToTypeID( "T   " );
+        var ref14 = new ActionReference();
+        var idChnl = charIDToTypeID( "Chnl" );
+        var idfsel = charIDToTypeID( "fsel" );
+        ref14.putProperty( idChnl, idfsel );
+    desc12.putReference( idT, ref14 );
+executeAction( idAdd, desc12, DialogModes.NO );
