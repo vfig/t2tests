@@ -126,6 +126,7 @@ def process_contexts(contexts):
 
 MAX_PAGES = 32
 MAX_REGIONS = 256
+ALL_LANGUAGES = ['english', 'french', 'german', 'spanish', 'russian', 'italian']
 
 import re
 LANGUAGE_REGEX = re.compile(r"english|french|german|spanish|russian|italian")
@@ -222,6 +223,87 @@ def make_export_plan(doc):
       pass
   find_interesting_objects(doc, assign_object)
 
+def build_page_assets(page, objects, define_asset):
+  page_objects = []
+  region_objects = []
+  lang_objects = []
+  for o in objects:
+    if o['page'] == p and o['region'] is not None:
+      region_objects.append(o)
+    elif o['page'] == p and o['region'] is None:
+      page_objects.append(o)
+    elif o['page'] is None and o['lang'] is not None:
+      lang_objects.append(o)
+  # If there's nothing specific to this page, we're not going to export it!
+  if not page_objects: return
+  # Figure out the languages in use for this page.
+  used_langs = {}
+  for o in region_objects + page_objects + lang_objects:
+    lang = o['lang']
+    if lang is not None:
+      used_langs[lang] = True
+  used_langs = used_langs.keys()
+  # If any langs are used, then (for simplicity) assume they are used for all
+  # assets in this page. So we reprocess the page and region lists, expanding
+  # each for all langs.
+  if used_langs:
+    expanded_page_objects = []
+    for o in page_objects:
+      if o['lang'] is not None:
+        expanded_page_objects.append(o)
+      else:
+        for lang in used_langs:
+          expanded_page_objects.append({
+            'layer': o['layer'],
+            'page': o['page'],
+            'region': o['region'],
+            'lang': lang
+            })
+    page_objects = expanded_page_objects
+    expanded_region_objects = []
+    for o in region_objects:
+      if o['lang'] is not None:
+        expanded_region_objects.append(o)
+      else:
+        for lang in used_langs:
+          expanded_region_objects.append({
+            'layer': o['layer'],
+            'page': o['page'],
+            'region': o['region'],
+            'lang': lang
+            })
+    region_objects = expanded_region_objects
+  # So now the lists are ready to use.
+  # Sort them for convenience of output
+  page_objects.sort(key=lambda o: (o['lang'], o['page'], o['region']))
+  region_objects.sort(key=lambda o: (o['lang'], o['page'], o['region']))
+  # Print stuff, see where we're at...
+  print()
+  print("after expansion:")
+  print("PAGE\tREGION\tLANG\tNAME")
+  for o in page_objects + region_objects:
+    print_page = o['page']
+    print_region = o['region']
+    print_lang = o['lang']
+    print_name = o['layer']['name']
+    print(f"{print_page}\t{print_region}\t{print_lang}\t'{print_name}'")
+
+  for lang in [None] + ALL_LANGUAGES:
+    layers = [o['layer'] for o in page_objects if o['lang'] == lang]
+    if lang is None:
+      filename = f"page{page:03}"
+    else:
+      filename = f"{lang}/page{page:03}"
+    if not layers: continue
+    define_asset(filename, layers)
+    for r in range(MAX_REGIONS):
+      layers = [o['layer'] for o in region_objects if o['region'] == r and o['lang'] == lang]
+      if not layers: continue
+      if lang is None:
+        filename = f"p{page:03}r{r:03}"
+      else:
+        filename = f"{lang}/p{page:03}r{r:03}"
+      define_asset(filename, layers)
 
 if __name__ == '__main__':
   #import contexts
@@ -229,8 +311,8 @@ if __name__ == '__main__':
   import hack
   #make_export_plan(hack.document)
 
-  #doc = hack.newbridge_document
-  doc = hack.operahouse_document
+  doc = hack.newbridge_document
+  # doc = hack.operahouse_document
 
   print("PAGE\tREGION\tLANG\tNAME")
   def interesting_object(o, page, region, lang):
@@ -248,70 +330,20 @@ if __name__ == '__main__':
   # To allow language layers to be independent... expand...
   # So... a language layer with no page should be warned + ignored
   # A page layer with no specific language needs to be expanded to all languages in use for that page?
+  all_assets = []
+  def define_asset(filename, layers):
+    all_assets.append({'filename': filename, 'layers': layers})
   for p in range(MAX_PAGES):
-    page_objects = []
-    region_objects = []
-    lang_objects = []
-    for o in all_interesting_objects:
-      if o['page'] == p and o['region'] is not None:
-        region_objects.append(o)
-      elif o['page'] == p and o['region'] is None:
-        page_objects.append(o)
-      elif o['page'] is None and o['lang'] is not None:
-        lang_objects.append(o)
-    # If there's nothing specific to this page, we're not going to export it!
-    if not page_objects: continue
-    # Figure out the languages in use for this page.
-    used_langs = {}
-    for o in region_objects + page_objects + lang_objects:
-      lang = o['lang']
-      if lang is not None:
-        used_langs[lang] = True
-    used_langs = used_langs.keys()
-    # If any langs are used, then (for simplicity) assume they are used for all
-    # assets in this page. So we reprocess the page and region lists, expanding
-    # each for all langs.
-    if used_langs:
-      expanded_page_objects = []
-      for o in page_objects:
-        if o['lang'] is not None:
-          expanded_page_objects.append(o)
-        else:
-          for lang in used_langs:
-            expanded_page_objects.append({
-              'layer': o['layer'],
-              'page': o['page'],
-              'region': o['region'],
-              'lang': lang
-              })
-      page_objects = expanded_page_objects
-      expanded_region_objects = []
-      for o in region_objects:
-        if o['lang'] is not None:
-          expanded_region_objects.append(o)
-        else:
-          for lang in used_langs:
-            expanded_region_objects.append({
-              'layer': o['layer'],
-              'page': o['page'],
-              'region': o['region'],
-              'lang': lang
-              })
-      region_objects = expanded_region_objects
-    # So now the lists are ready to use.
-    # Sort them for convenience of output
-    page_objects.sort(key=lambda o: (o['lang'], o['page'], o['region']))
-    region_objects.sort(key=lambda o: (o['lang'], o['page'], o['region']))
-    # Print stuff, see where we're at...
-    print()
-    print("after expansion:")
-    print("PAGE\tREGION\tLANG\tNAME")
-    for o in page_objects + region_objects:
-      page = o['page']
-      region = o['region']
-      lang = o['lang']
-      name = o['layer']['name']
-      print(f"{page}\t{region}\t{lang}\t'{name}'")
+    build_page_assets(p, all_interesting_objects, define_asset)
+
+  print()
+  print("assets:")
+  s = "FILENAME"
+  print(f"{s:20}\tLAYERS")
+  for a in all_assets:
+    filename = a['filename']
+    layer_names = ", ".join(l['name'] for l in a['layers'])
+    print(f"{filename:20}\t{layer_names}")
 
 # Note: when using bounds, be sure that the layer bounds doesn't exceed the doc bounds! and clip it if it does.
 # Note: language-only layers should only be bound to all _pages_, not regions. When exporting a region, its
