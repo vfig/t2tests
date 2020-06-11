@@ -383,3 +383,24 @@ var idAdd = charIDToTypeID( "Add " );
         ref14.putProperty( idChnl, idfsel );
     desc12.putReference( idT, ref14 );
 executeAction( idAdd, desc12, DialogModes.NO );
+
+
+
+
+/* //To do a progress bar:
+function WaitForRedraw(){
+    $.sleep(1);
+    app.refresh();
+}
+var win = new Window("window{text:'Progress',bounds:[100,100,400,150],bar:Progressbar{bounds:[20,20,280,31] , value:0,maxvalue:100}};");
+win.show();
+try {
+    for(var i=0; i<10; ++i){
+        Log("tick " + i);
+        win.bar.value = i / 10.0 * 100.0;
+        WaitForRedraw();    
+    }
+} finally {
+    win.close();
+}
+*/
