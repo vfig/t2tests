@@ -57,8 +57,8 @@ function BuildLanguageRegExp(languages) {
 }
 
 const LANGUAGE_REGEX = BuildLanguageRegExp(LANGUAGES);
-const PAGE_REGEX = new RegExp("p(?:age)?\\s*([0-9]{1,3})", 'i');
-const REGION_REGEX = new RegExp("r(?:egion)?\\s*([0-9]{1,3})", 'i');
+const PAGE_REGEX = new RegExp("\\bp(?:age)?\\s*([0-9]{1,3})(?:r(?:egion)?\\s*[0-9]{1,3})?\\b", 'i');
+const REGION_REGEX = new RegExp("\\b(?:p(?:age)?\\s*[0-9]{1,3})?r(?:egion)?\\s*([0-9]{1,3})\\b", 'i');
 
 function GetPageFromName(name) {
     var m = name.match(PAGE_REGEX);
@@ -99,9 +99,7 @@ function PeriodicWait() {
 }
 
 function RelevantLayer(layer, page, region, language) {
-    var b = layer.bounds;
     this.layer = layer;
-    this.bounds = [b[0].as("px"), b[1].as("px"), b[2].as("px"), b[3].as("px")];
     this.page = page;
     this.region = region;
     this.language = language;
@@ -150,15 +148,15 @@ function FindRelevantLayers(doc) {
     return relevantLayers;
 }
 
-function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
+function BuildAssetsForPage(doc, page, relevantLayers, defineAssetFn) {
     var pageLayers = [];
     var regionLayers = [];
     var languageLayers = [];
     for (var i=0; i<relevantLayers.length; ++i) {
         var rl = relevantLayers[i];
-        if (rl.page === p && rl.region !== null) {
+        if (rl.page === page && rl.region !== null) {
             regionLayers.push(rl);
-        } else if (rl.page === p && rl.region === null) {
+        } else if (rl.page === page && rl.region === null) {
             pageLayers.push(rl);
         } else if (rl.page === null && rl.language !== null) {
             languageLayers.append(rl);
@@ -271,14 +269,15 @@ function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
         for (var j=0; j<pageLayers.length; ++j) {
             var rl = pageLayers[j];
             if (rl.language === language) {
-                pageAndLanguageLayers.push(rl);
+                pageAndLanguageLayers.push(rl.layer);
             }
         }
         if (pageAndLanguageLayers.length == 0) continue;
 
+        var bounds = [0, 0, doc.width.as("px"), doc.height.as("px")];
         var basename = "page" + ThreeDigits(page);
         var filename = (language !== null ? (language + "/" + basename) : basename);
-        defineAssetFn(filename, pageAndLanguageLayers);
+        defineAssetFn(filename, bounds, pageAndLanguageLayers);
 
         // Build region assets for this language.
         for (var r=0; r<MODE.MAX_REGIONS; ++r) {
@@ -286,7 +285,7 @@ function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
             for (var j=0; j<regionLayers.length; ++j) {
                 var rl = regionLayers[j];
                 if (rl.region === r && rl.language === language) {
-                    regionAndLanguageLayers.push(rl);
+                    regionAndLanguageLayers.push(rl.layer);
                 }
             }
             if (regionAndLanguageLayers.length == 0) continue;
@@ -299,48 +298,117 @@ function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
             // FIXME: although I suppose with alpha transparency the compositing isn't needed. It would
             // FIXME: only be required for olddark/pcx mode...
             // FIXME: But for now, just concat in the page layers for a full list for this asset:
-            regionAndLanguageLayers = pageLayers.concat(regionAndLanguageLayers);
+            var assetLayers = pageAndLanguageLayers.concat(regionAndLanguageLayers);
+            var bounds = [doc.width.as("px"), doc.height.as("px"), 0, 0];
+            for (var j=0; j<regionAndLanguageLayers.length; ++j) {
+                var lb = regionAndLanguageLayers[j].bounds;
+                var b = [lb[0].as("px"), lb[1].as("px"), lb[2].as("px"), lb[3].as("px")];
+                bounds[0] = Math.min(bounds[0], b[0]);
+                bounds[1] = Math.min(bounds[1], b[1]);
+                bounds[2] = Math.max(bounds[2], b[2]);
+                bounds[3] = Math.max(bounds[3], b[3]);
+            }
             var basename = "p" + ThreeDigits(page) + "r" + ThreeDigits(r);
             var filename = (language !== null ? (language + "/" + basename) : basename);
-            defineAssetFn(filename, regionAndLanguageLayers);
+            defineAssetFn(filename, bounds, assetLayers);
         }
     }
 }
 
-var relevantLayers = FindRelevantLayers(activeDocument);
+function DefineAssets(doc) {
+    var relevantLayers = FindRelevantLayers(doc);
 
-/*
-// FIXME: temp
-for (var i=0; i<relevantLayers.length; ++i) {
-    var rl = relevantLayers[i];
-    Log(rl.layer.typename + " " + rl.layer.name + ": p" + rl.page + " r" + rl.region + " l" + rl.language);
-}
-Log("--------------------");
-*/
-
-// Build out the asset list for each page.
-var allAssets = [];
-function Asset(filename, layers) {
-    this.filename = filename;
-    this.layers = layers;
-}
-function DefineAsset(filename, layers) {
-    allAssets.push(new Asset(filename, layers));
-}
-for (var p=0; p<MODE.MAX_PAGES; ++p) {
-    BuildAssetsForPage(p, relevantLayers, DefineAsset);
-    PeriodicWait();
-}
-
-// FIXME: temp. log the assets!
-Log("--------------------");
-Log(" ");
-Log("assets:")
-for (var i=0; i<allAssets.length; ++i) {
-    var a = allAssets[i];
-    var l = [];
-    for (var j=0; j<a.layers.length; ++j) {
-        l.push(a.layers[j].layer.name);
+    /*
+    // FIXME: temp
+    for (var i=0; i<relevantLayers.length; ++i) {
+        var rl = relevantLayers[i];
+        Log(rl.layer.typename + " " + rl.layer.name + ": p" + rl.page + " r" + rl.region + " l" + rl.language);
     }
-    Log(a.filename + ": " + l.join(", "));
+    Log("--------------------");
+    */
+
+    // Build out the asset list for each page.
+    var allAssets = [];
+    function Asset(filename, bounds, layers) {
+        this.filename = filename;
+        this.bounds = bounds;
+        this.layers = layers;
+    }
+    function DefineAsset(filename, bounds, layers) {
+        allAssets.push(new Asset(filename, bounds, layers));
+    }
+    for (var p=0; p<MODE.MAX_PAGES; ++p) {
+        BuildAssetsForPage(doc, p, relevantLayers, DefineAsset);
+        PeriodicWait();
+    }
+
+    /*
+    // FIXME: temp. log the assets!
+    Log("--------------------");
+    Log(" ");
+    Log("assets:")
+    for (var i=0; i<allAssets.length; ++i) {
+        var a = allAssets[i];
+        var l = [];
+        for (var j=0; j<a.layers.length; ++j) {
+            l.push(a.layers[j].layer.name);
+        }
+        Log(a.filename + ": " + l.join(", "));
+    }
+    */
+    var allLayers = [];
+    for (var i=0; i<relevantLayers.length; ++i) {
+        allLayers.push(relevantLayers[i].layer);
+    }
+
+    return {
+        'assets': allAssets,
+        'allLayers': allLayers,
+    };
 }
+
+function ExportAssets(doc) {
+    var initialState = doc.activeHistoryState;
+    var plan = DefineAssets(doc);
+    var saveOptions = new PNGSaveOptions();
+    saveOptions.interlaced = false;
+
+    try {
+        for (var i=0; i<plan.assets.length; ++i) {
+            // Hide all layers
+            for (var j=0; j<plan.allLayers.length; ++j) {
+                var l = plan.allLayers[j];
+                l.visible = false;
+            }
+            // Show only layers for this asset
+            var asset = plan.assets[i];
+            for (var j=0; j<asset.layers.length; ++j) {
+                var l = asset.layers[j];
+                l.visible = true;
+            }
+            // Crop and save (FIXME: support path selection! support formats other than .png!)
+            doc.crop(asset.bounds);
+            // NOTE! there is also doc.trim() to remove transparent areas.. BUT I don't know
+            // how much it would remove, so it's kinda unreliable I guess?
+
+            app.refresh();
+            $.sleep(1);
+
+            var path = "e:/temp/automap/";
+            var file = new File(path + asset.filename);
+            doc.saveAs(file, saveOptions, true);
+            Log(file.fsName);
+
+            doc.activeHistoryState = initialState;
+        }
+    } finally {
+        //app.bringToFront();
+        app.refresh();
+        $.sleep(1);
+        // FIXME: this doesn't seem to work? The file is left changed?
+        doc.activeHistoryState = initialState;
+    }
+    //app.purge(PurgeTarget.HISTORYCACHES);
+}
+
+ExportAssets(activeDocument);
