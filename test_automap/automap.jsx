@@ -39,6 +39,10 @@ function LogWarning(message) {
     $.writeln("WARNING: " + message);
 }
 
+function ThreeDigits(n) {
+    return ('000' + n.toString()).slice(-3);
+}
+
 // FIXME: I think all the stuff between here and the next message is irrelevant.
 
 function Context(document) {
@@ -301,10 +305,6 @@ function XXXBuildExportPlan(allContexts) {
 }
 */
 
-function ThreeDigits(n) {
-    return ('000' + n.toString()).slice(-3);
-}
-
 function DeriveFileKey(language, page, region) {
     if (page === null) {
         return null;
@@ -543,6 +543,16 @@ try {
 
 ////////////////////////////
 
+var previousWaitTime = 0;
+const WaitInterval = 5000;
+function Wait() {
+    var now = (new Date()).getTime();
+    if (now - previousWaitTime >= WaitInterval) {
+        previousWaitTime = now;
+        $.sleep(1);
+        app.refresh();
+    }
+}
 
 function RelevantLayer(layer, page, region, language) {
     var b = layer.bounds;
@@ -575,8 +585,6 @@ function FindRelevantLayersRecursive(o, foundRelevantLayerFn, inheritedPage, inh
 
     if (isRelevant) {
         foundRelevantLayerFn(new RelevantLayer(o, resolvedPage, resolvedRegion, resolvedLanguage));
-    } else {
-        Log("not relevant: '" + name + "' isLayer:" + isLayer + " page:" + page + " region:" + region + " language:" + language);
     }
     if (hasSublayers) {
         var sublayers = o.layers;
@@ -584,6 +592,8 @@ function FindRelevantLayersRecursive(o, foundRelevantLayerFn, inheritedPage, inh
             FindRelevantLayersRecursive(sublayers[i], foundRelevantLayerFn, resolvedPage, resolvedLanguage);
         }
     }
+
+    Wait();
 }
 
 function FindRelevantLayers(doc) {
@@ -696,6 +706,7 @@ function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
     pageLayers.sort(compareRelevantLayers);
     regionLayers.sort(compareRelevantLayers);
 
+    /*
     // Print stuff, see where we're at...
     Log("after expansion:");
     for (var i=0; i<pageLayers.length; ++i) {
@@ -706,44 +717,84 @@ function BuildAssetsForPage(page, relevantLayers, defineAssetFn) {
         var rl = regionLayers[i];
         Log("page " + rl.page + ", region " + rl.region + ", language " + rl.language + " : " + rl.layer.name);
     }
-/*
-      for lang in [None] + ALL_LANGUAGES:
-        layers = [o['layer'] for o in pageLayers if o['lang'] == lang]
-        if lang is None:
-          filename = f"page{page:03}"
-        else:
-          filename = f"{lang}/page{page:03}"
-        if not layers: continue
-        define_asset(filename, layers)
-        for r in range(MAX_REGIONS):
-          layers = [o['layer'] for o in regionLayers if o['region'] == r and o['lang'] == lang]
-          if not layers: continue
-          if lang is None:
-            filename = f"p{page:03}r{r:03}"
-          else:
-            filename = f"{lang}/p{page:03}r{r:03}"
-          define_asset(filename, layers)
-*/
+    */
+
+    var exportLanguages = [null].concat(usedLanguages);
+    for (var i=0; i<exportLanguages.length; ++i) {
+        // Build page asset for this language.
+        var language = exportLanguages[i];
+        var pageAndLanguageLayers = [];
+        for (var j=0; j<pageLayers.length; ++j) {
+            var rl = pageLayers[j];
+            if (rl.language === language) {
+                pageAndLanguageLayers.push(rl);
+            }
+        }
+        if (pageAndLanguageLayers.length == 0) continue;
+
+        var basename = "page" + ThreeDigits(page);
+        var filename = (language !== null ? (language + "/" + basename) : basename);
+        defineAssetFn(filename, pageAndLanguageLayers);
+
+        // Build region assets for this language.
+        for (var r=0; r<MODE.MAX_REGIONS; ++r) {
+            var regionAndLanguageLayers = [];
+            for (var j=0; j<regionLayers.length; ++j) {
+                var rl = regionLayers[j];
+                if (rl.region === r && rl.language === language) {
+                    regionAndLanguageLayers.push(rl);
+                }
+            }
+            if (regionAndLanguageLayers.length == 0) continue;
+            // FIXME: do we want to have alpha transparency? Then don't concatenate here?
+            // FIXME: need to figure out exactly what we're going to export!
+            // FIXME: I guess regions for T2 style _always_ need to be transparent; just that traditionally
+            // FIXME: they used 1-bit alpha in the palette?
+            // FIXME: which makes things a little bit awkward, doesn't it? They probably still need to
+            // FIXME: be _composited_ with the page layers, but _cropped_ to the region outline.
+            // FIXME: But for now, just concat in the page layers for a full list for this asset:
+            regionAndLanguageLayers = pageLayers.concat(regionAndLanguageLayers);
+            var basename = "p" + ThreeDigits(page) + "r" + ThreeDigits(r);
+            var filename = (language !== null ? (language + "/" + basename) : basename);
+            defineAssetFn(filename, regionAndLanguageLayers);
+        }
+    }
 }
 
-// FIXME: temp
 var relevantLayers = FindRelevantLayers(activeDocument);
+
+/*
+// FIXME: temp
 for (var i=0; i<relevantLayers.length; ++i) {
     var rl = relevantLayers[i];
     Log(rl.layer.typename + " " + rl.layer.name + ": p" + rl.page + " r" + rl.region + " l" + rl.language);
 }
 Log("--------------------");
-
-/*
-  all_assets = []
-  def define_asset(filename, layers):
-    all_assets.append({'filename': filename, 'layers': layers})
-  for p in range(MAX_PAGES):
-    build_page_assets(p, all_interesting_objects, define_asset)
 */
+
+// Build out the asset list for each page.
+var allAssets = [];
+function Asset(filename, layers) {
+    this.filename = filename;
+    this.layers = layers;
+}
 function DefineAsset(filename, layers) {
-    // todo
+    allAssets.push(new Asset(filename, layers));
 }
 for (var p=0; p<MODE.MAX_PAGES; ++p) {
     BuildAssetsForPage(p, relevantLayers, DefineAsset);
+    Wait();
+}
+
+// FIXME: temp. log the assets!
+Log("--------------------");
+Log(" ");
+Log("assets:")
+for (var i=0; i<allAssets.length; ++i) {
+    var a = allAssets[i];
+    var l = [];
+    for (var j=0; j<a.layers.length; ++j) {
+        l.push(a.layers[j].layer.name);
+    }
+    Log(a.filename + ": " + l.join(", "));
 }
