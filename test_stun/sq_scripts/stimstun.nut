@@ -1,28 +1,32 @@
 // Stuns this AI when hit with a stim.
 // Requires NewDark v1.27 or higher.
 //
-// This uses WaterStim as a placeholder. To use a different stim, edit
-// this and replace WaterStim everywhere with the name of your chosen stim.
+// This uses WaterStim as an example. To use a different stim, edit
+// this and rename OnWaterStimStimulus to e.g. "OnMyStimNameStimulus";
+// the "On" prefix and "Stimulus" suffix must remain unchanged.
 //
 // To use:
 //
 // 1. Add a receptron for WaterStim to the AI (or archetype), with:
 //      No Min, No Max, Effect: Send to Scripts.
 //
-// 2. Add the WaterStimStun script to the AI (or archetype).
+// 2. Add the StimStun script to the AI (or archetype).
 //
-class WaterStimStun extends SqRootScript
+class StimStun extends SqRootScript
 {
     function OnBeginScript() {
         // Version check: complain if on an old version of NewDark.
         if (GetAPIVersion() < 11) {
-            DarkUI.TextMessage("NewDark 1.27 required for WaterStimStun!");
+            DarkUI.TextMessage("ERROR: NewDark 1.27 required for StimStun!");
             Object.Destroy(self);
         }
     }
 
     function OnWaterStimStimulus() {
-        local intensity = message().intensity;
+        DoStun(message().intensity);
+    }
+
+    function DoStun(intensity) {
         if (intensity >= 0.2) {
             // This will have no effect at intensities below 0.2,
             // and at higher intensities will stun the AI for between
