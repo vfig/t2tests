@@ -43,6 +43,10 @@
     source about 0.25 units!!
     But a radius of 2.0 is smoother, and cuts off a little before a 1.5 offset.
 
+    SO: this goes really bad when crossing room boundaries. And not even always
+    just a momentary hitch, cause standing across a room border stops it even
+    playing at all?? Added a detach button to try and debug this, but really
+    I don't know where to begin.
 */
 
 class TestCrossfade extends SqRootScript
@@ -90,6 +94,7 @@ class TestCrossfade extends SqRootScript
             LinkTools.LinkSetData(sourceLink, "vhot/sub #", 0); // PLAYER_HEAD
             LinkTools.LinkSetData(sourceLink, "rel pos", vector());
             LinkTools.LinkSetData(sourceLink, "rel rot", vector());
+            LinkTools.LinkSetData(sourceLink, "Flags", 1);
             // Link "DetailAttachement"    // type sDetailAttachLinkData     , flags 0x0000
             // {
             //     "Type" : enum    // enums: "Object", "Vhot", "Joint", "Submodel", "Subobject", "Transparent Decal"
@@ -102,6 +107,16 @@ class TestCrossfade extends SqRootScript
             //     "Flags" : bitflags    // flags: "No Auto-Delete", "No Joint Rot"
             // }
         }
+    }
+
+    function OnDetach() {
+        Link.Destroy(sourceLink);
+        sourceLink = 0;
+
+            // local relpos = vector(0,0,t*CROSSFADE_Z_OFFSET);
+            // print("Timer - t: " + t + ", endT: " + endT + ", time: " + time + ", relpos: " + relpos);
+            // LinkTools.LinkSetData(sourceLink, "rel pos", relpos);
+
     }
 
     function OnFadeIn() {
@@ -178,5 +193,14 @@ class TriggerFadeOut extends SqRootScript
         local player = ObjID("Player");
         print("Sending FadeOut to " + player);
         SendMessage(player, "FadeOut");
+    }
+}
+
+class TriggerDetach extends SqRootScript
+{
+    function OnFrobWorldend() {
+        local player = ObjID("Player");
+        print("Sending Detach to " + player);
+        SendMessage(player, "Detach");
     }
 }
