@@ -11,29 +11,86 @@
         if so:
             play success feedback sound + effect
           * teleport player there
-            move witch's head to inventory
+          * move witch's head to inventory
         if not:
             play failure feedback sound + effect
             teleport player back to original location
-            move witch's head to inventory
+          * move witch's head to inventory
 */
+const DEBUG_PHYSICS = false;
 class ToolWitchesHead extends SqRootScript
 {
     function OnSim() {
         if (message().starting) {
             Physics.SubscribeMsg(self, ePhysScriptMsgType.kFellAsleepMsg);
+
+            if (DEBUG_PHYSICS) {
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kWokeUpMsg);
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kMadePhysMsg);
+                Physics.SubscribeMsg(self, ePhysScriptMsgType.kMadeNonPhysMsg);
+            }
         } else {
             Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kFellAsleepMsg);
+
+            if (DEBUG_PHYSICS) {
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kContactMsg);
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kEnterExitMsg);
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kWokeUpMsg);
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kMadePhysMsg);
+                Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kMadeNonPhysMsg);
+            }
         }
     }
 
     // on throw: AttachRemoteCameraTo(head_probe, head_cam); ?? what are these params?
 
     function OnPhysFellAsleep() {
+        // BUG: Sometimes when the witch's head collides with a door, it stops
+        //      moving but never receives a PhysFellAsleep message. This appears
+        //      to occur more often when the head hits the door at an angle and
+        //      remains very near it. When this happens, the head remains where
+        //      it lands and neither the successful teleport nor the failure
+        //      happen, which will leave the player stuck in the blue room.
+        //      (When trying to replicate, temporarily disable the teleporting
+        //      and watch the physics messages when you throw it repeatedly
+        //      against the door).
+        //
+        // POSSIBLE WORKAROUND: Keep state to track the head in-flight or the
+        //      head landed. Use a timer to periodically poll the head's
+        //      velocity while in flight, and when it reaches a minimum, then
+        //      do the teleport.
+
         print("WitchesHead: " + message().message);
         local controller = Object.Named("WitchesHeadController");
-        print("found Controller: " + controller);
         SendMessage(controller, "Translocate", self);
+    }
+
+    function OnPhysCollision() {
+        print("WitchesHead: " + message().message);
+    }
+
+    function OnPhysContact() {
+        print("WitchesHead: " + message().message);
+    }
+
+    function OnPhysEnterExit() {
+        print("WitchesHead: " + message().message);
+    }
+
+    function OnPhysWokeUp() {
+        print("WitchesHead: " + message().message);
+    }
+
+    function OnPhysMadePhys() {
+        print("WitchesHead: " + message().message);
+    }
+
+    function OnPhysMadeNonPhys() {
+        print("WitchesHead: " + message().message);
     }
 }
 
@@ -103,8 +160,12 @@ class WitchesHeadController extends SqRootScript
         local target = message().data;
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
-        local new_pos = Object.Position(target);
+
+        local foot_offset = (Object.Position(foot_marker) - pos);
+        local target_radius = Property.Get(target, "PhysDims", "Radius 1");
+        local new_pos = Object.Position(target) - foot_offset - vector(0,0,target_radius);
         local new_facing = Object.Facing(target); // TODO: use this
+
         local valid = Probe(new_pos);
         print((valid ? "Valid" : "Invalid") + " attempt to translocate from " + pos + " to " + new_pos);
 
@@ -117,6 +178,9 @@ class WitchesHeadController extends SqRootScript
         // Then query against that before teleporting to see if it should be allowed.
         //
         // POSSIBLE WORKAROUND: just dont let this happen in the level, you fool!
+
+        // Pick up the head again (before teleporting, so they will not collide)
+        Container.Add(target, player);
 
         if (valid) {
             Object.Teleport(player, new_pos, facing);
@@ -145,8 +209,6 @@ class WitchesHeadController extends SqRootScript
             // Translocating now would put us inside a wall or something. That's not great.
             Sound.PlayVoiceOver(player, "blue_light_off");
         }
-
-        // TODO: Pick up the head again
     }
 
     function Probe(pos) {
