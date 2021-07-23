@@ -4,7 +4,7 @@
     rough outline:
 
     when thrown:
-        attach camera
+     -> attach camera
         teleport player to specific blue room
     when landing:
       * check if theres room for the player
@@ -17,10 +17,47 @@
             teleport player back to original location
           * move witch's head to inventory
 */
+/*
+    Camera modes:
+
+        + desirable
+        = acceptable / can be worked around
+        - undesirable
+        x showstopper
+
+    VIEW_CAM:
+        to achieve: StaticAttach() on a physical object
+      + player: frozen
+      - mouselook: none
+      - sound: from player location
+      x effects: fade-in/fade-out
+      = fov: wide
+
+    REMOTE_CAM:
+        to achieve: DynamicAttach() on a physical object
+      + player: frozen
+      + mouselook: full
+      - sound: from player location
+      x effects: fade-in/fade-out
+      = fov: wide
+        note: camera facing is weird (see adjustment in dual/translocator.nut)
+
+    OBJ_ATTACH:
+        to achieve: StaticAttach() or DynamicAttach() on an non-physical object
+      = player: can still move
+      - mouselook: none
+      + sound: from camera-attached-object location
+      + effects: none
+      = fov: default
+
+    CONCLUSION: force OBJ_ATTACH mode, and live with no mouselook.
+*/
+
 const DEBUG_PHYSICS = false;
 class ToolWitchesHead extends SqRootScript
 {
     function OnSim() {
+        print("WitchesHead: " + message().message);
         if (message().starting) {
             Physics.SubscribeMsg(self, ePhysScriptMsgType.kFellAsleepMsg);
 
@@ -46,7 +83,119 @@ class ToolWitchesHead extends SqRootScript
         }
     }
 
-    // on throw: AttachRemoteCameraTo(head_probe, head_cam); ?? what are these params?
+    function OnFrobInvEnd() {
+        print("WitchesHead: " + message().message);
+        // question: are we still contained at this point?
+        local player = Object.Named("Player");
+        local c = Container.IsHeld(self, player);
+        if (c != eContainType.ECONTAIN_NULL) {
+            print("  Object still contained by player at: " + c);
+        } else {
+            print("  Object no longer held by player.");
+
+            // ISSUE: This is too soon to attach the camera! The throw hasn't
+            // begun yet, but the throw direction gets derived from the camera
+            // angle. As a result, attaching here causes throws to go straight
+            // out from the player's chest.
+            // print("Attaching camera to head.");
+            // Camera.DynamicAttach(self);
+        }
+    }
+
+    function OnContained() {
+        print("WitchesHead: " + message().message);
+        // well, we are definitely not still contained here, if the message is
+        // right.
+
+        if (message().event == eContainsEvent.kContainRemove) {
+            // This is not robust against stacking. Let the level designer
+            // avoid such possibilities!
+            print("  Removed from container");
+            // NOTE: We get a Contained/kContainRemove message at game start if
+            // the witch's head is contained by the starting point or a
+            // difficulty-level inventory container. So make sure we only
+            // camera-attach when being removed from the player.
+            local player = Object.Named("Player");
+            if (message().container == player) {
+                // BUG: Behaviour when dropped or when thrown is wildly different!
+                //
+                // When dropped: OBJ_ATTACH mode: no FOV change; no effect when
+                // attaching/detaching camera.
+                //      OnContained/kContainRemove
+                //      Camera.DynamicAttach()
+                //      PhysMadePhysical
+                //
+                // When thrown: REMOTE_CAM mode: forced wide FOV; fade-from-black/
+                // fade-to-white when attaching/detaching camera.
+                //      FrobInvEnd
+                //      PhysMadePhysical
+                //      OnContained/kContainRemove
+                //      Camera.DynamicAttach()
+                //
+                // This difference occurs because camera.c:CameraRemote() hardcodes
+                // these behavious based on whether the target has physics at
+                // that moment.
+
+                // print("Attaching camera to head.");
+                // Camera.DynamicAttach(self); // variously OBJ_ATTACH or REMOTE_CAM
+            }
+        }
+    }
+
+    function OnPhysMadePhysical() {
+        print("WitchesHead: " + message().message);
+        // Either we have just started existing, or we have just been dropped
+        // or thrown by the player.
+        // TODO: don't attach the camera in the former case!
+
+        // ISSUE: Although we have just been 'made physical', querying
+        // Physics.HasPhysics() at this moment returns false! As a result,
+        // doing the camera attach right now means we get the wrong mode
+        // (OBJ_ATTACH) forced upon us due to lack of physics. Which means
+        // no mouselook (and player is not frozen, but that's manageable).
+        //
+        // WORKAROUND: Post a message so we attach the camera next frame.
+        PostMessage(self, "LookThroughEyes");
+
+        //print("  Have physics? " + Physics.HasPhysics(self));
+
+        // NOTE: this does not work to force 'has physics'
+        //Physics.Activate(self);
+        //print("  Have physics? " + Physics.HasPhysics(self));
+
+        // print("  Attaching camera to head.");
+        // Camera.DynamicAttach(self); // OBJ_ATTACH
+    }
+
+    // ISSUE: REMOTE_CAM/VIEW_CAM modes have hardcoded fade-in that is *much*
+    // too long! This means you cannot see the arc of the head, nor see how
+    // you are mouselooking it for the first, crucial moments of its flight!
+    //
+    // POSSIBLE SOLUTION: If we embrace the OBJ_ATTACH mode (which does NOT
+    // freeze the player), and go ahead with teleporting the player to a blue
+    // room, then the lack of freeze is acceptable.
+
+    // BUG: if you click while the head is still moving through the air,
+    // the camera is returned too early!
+    //
+    // SOLUTION: track CameraAttach/CameraDetach messages as well. And activate
+    // the teleport if the player detaches mid-flight (perhaps also give the
+    // player some of the velocity)
+
+    function OnPhysMadeNonPhysical() {
+        print("WitchesHead: " + message().message);
+        print("  Returning camera to player.");
+        Camera.CameraReturn(self);
+    }
+
+    function OnLookThroughEyes() {
+        print("WitchesHead: " + message().message);
+        // ISSUE: attaching now means we are forced to suffer the fade :(
+
+        print("  Attaching camera to head.");
+        //Camera.DynamicAttach(self); // REMOTE_CAM
+        //Camera.StaticAttach(self); // VIEW_CAM
+    }
 
     function OnPhysFellAsleep() {
         // BUG: Sometimes when the witch's head collides with a door, it stops
@@ -59,6 +208,10 @@ class ToolWitchesHead extends SqRootScript
         //      and watch the physics messages when you throw it repeatedly
         //      against the door).
         //
+        // NOTE: This now seems to be happening a lot more even when colliding
+        //      with just the ground (landing against the edge of the gravel
+        //      path is a common place for it to occur).
+        //
         // POSSIBLE WORKAROUND: Keep state to track the head in-flight or the
         //      head landed. Use a timer to periodically poll the head's
         //      velocity while in flight, and when it reaches a minimum, then
@@ -69,27 +222,7 @@ class ToolWitchesHead extends SqRootScript
         SendMessage(controller, "Translocate", self);
     }
 
-    function OnPhysCollision() {
-        print("WitchesHead: " + message().message);
-    }
-
-    function OnPhysContact() {
-        print("WitchesHead: " + message().message);
-    }
-
-    function OnPhysEnterExit() {
-        print("WitchesHead: " + message().message);
-    }
-
-    function OnPhysWokeUp() {
-        print("WitchesHead: " + message().message);
-    }
-
-    function OnPhysMadePhys() {
-        print("WitchesHead: " + message().message);
-    }
-
-    function OnPhysMadeNonPhys() {
+    function OnMessage() {
         print("WitchesHead: " + message().message);
     }
 }
@@ -107,8 +240,6 @@ const PLAYER_HEIGHT = 6.0;
 // local PLAYER_BODY_POS = ((PLAYER_HEIGHT / 2) - (PLAYER_RADIUS * 3));
 // local PLAYER_KNEE_POS = (-(PLAYER_HEIGHT * (13.0 / 30.0)));
 // local PLAYER_SHIN_POS = (-(PLAYER_HEIGHT * (11.0 / 30.0)));
-
-const FORCE_OBJ_ATTACH_MODE = false;
 
 // The mission must have one and only one Marker, named "WitchesHeadController", with this WitchesHeadController
 // script on it.
@@ -146,12 +277,6 @@ class WitchesHeadController extends SqRootScript
         head_probe = GetSphereProbe("PlayerHeadProbe", PLAYER_RADIUS);
         body_probe = GetSphereProbe("PlayerBodyProbe", PLAYER_RADIUS);
         foot_probe = GetSphereProbe("PlayerFootProbe", 0.0);
-
-        // FIXME: remove FORCE_OBJ_ATTACH_MODE, since it's got too many downsides.
-        if (FORCE_OBJ_ATTACH_MODE) {
-            // Create marker object for remote cam.
-            head_cam = GetCamMarker("PlayerHeadCam");
-        }
     }
 
     function OnTranslocate() {
@@ -160,6 +285,19 @@ class WitchesHeadController extends SqRootScript
         local target = message().data;
         local pos = Object.Position(player);
         local facing = Object.Facing(player);
+
+        // ISSUE: Witch's head that lands too close to a wall prevents
+        // translocation because the player's radius won't fit that close.
+        //
+        // WORKAROUND: Ensure the witch's head has a radius of 1.2, the same
+        // as the player.
+        //
+        // KNOCK-ON EFFECT: The larger radius prevents the witch's head from
+        // being thrown through narrow openings--but that was one of the key
+        // attractions of this design in the first place!
+        //
+        // POSSIBLE SOLUTION: Use a smaller radius, but figure out a different
+        // way to deal with the too-close-to-a-wall issue.
 
         local foot_offset = (Object.Position(foot_marker) - pos);
         local target_radius = Property.Get(target, "PhysDims", "Radius 1");
@@ -228,56 +366,6 @@ class WitchesHeadController extends SqRootScript
         return valid;
     }
 
-    function AttachRemoteCameraTo(probe, camera_marker) {
-        local pos = Object.Position(probe);
-        local facing = Camera.GetFacing();
-        local attach_camera_to;
-
-        if (FORCE_OBJ_ATTACH_MODE) {
-            // NOTE: The cam object no physics model, so when calling Camera.DynamicAttach,
-            // we get the OBJ_ATTACH camera mode instead of the normal REMOTE_CAM mode.
-            // But that's good, because OBJ_ATTACH mode doesn't do the flash when starting
-            // and ending, nor does it force the hard-coded remote cam FOV and lens overlay
-            // either!
-            // See camera.c:CameraRemote() and rend_loop.c:do_frame() for details.
-            attach_camera_to = camera_marker;
-
-            // BUG: When forcing OBJ_ATTACH mode, the camera position derived from the
-            // head marker / head probe seems to be off compared to the player's actual
-            // view. Need to debug with Camera.GetPosition() and compare to the marker
-            // or probe's position.
-
-            // BUG: When forcing OBJ_ATTACH mode with Camera.DynamicAttach, player input
-            // is not stopped. So the player can move, can use items and so on. This is
-            // pretty bad. So despite the visual advantages, might not want to use it.
-
-            // BUG: When forcing OBJ_ATTACH mode with Camera.DynamicAttach, the player's
-            // camera is reset to straight and level after returning (although z rotation
-            // remains unchanged). This is disorienting.
-        } else {
-            attach_camera_to = probe;
-
-            // NOTE: Can customise camera/camovl.txt somewhat to adjust the appearance of the
-            // lens overlay to be more suitable. But the remote camera FOV is hard-coded.
-            // Or can just use the NewDark Renderer/Camera Overlay property, for a different
-            // set of possible effects.
-
-            // BUG: When using Camera.DynamicAttach to a probe, the rotation of the probe's
-            // facing seems to end up doubled. Perhaps bug relating to the FOV change?
-            // (Note that this affects CamGrenades too, but since they're thrown, their
-            // initial orientation is somewhat random anyway, so who would notice?)
-            //
-            // WORKAROUND: Halve each component of the camera's facing so the transview
-            // cameras is looking the same way as the player was when activating it.
-            facing.x /= 2.0;
-            facing.y /= 2.0;
-            facing.z /= 2.0;
-        }
-
-        Object.Teleport(attach_camera_to, pos, facing, 0);
-        Camera.DynamicAttach(attach_camera_to);
-    }
-
     function GetSphereProbe(name, radius)
     {
         local obj = Object.Named(name);
@@ -323,17 +411,6 @@ class WitchesHeadController extends SqRootScript
         LinkTools.LinkSetData(link, "vhot/sub #", submodel);
         LinkTools.LinkSetData(link, "rel pos", vector(0.0, 0.0, 0.0));
         LinkTools.LinkSetData(link, "rel rot", vector(0.0, 0.0, 0.0));
-
-        return obj;
-    }
-
-    function GetCamMarker(name)
-    {
-        local obj = Object.Named(name);
-        if (obj != 0) { return obj; }
-
-        obj = Object.Create(Object.Named("Marker"));
-        Object.SetName(obj, name);
 
         return obj;
     }
