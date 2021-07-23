@@ -193,7 +193,7 @@ class ToolWitchesHead extends SqRootScript
         // ISSUE: attaching now means we are forced to suffer the fade :(
 
         print("  Attaching camera to head.");
-        //Camera.DynamicAttach(self); // REMOTE_CAM
+        Camera.DynamicAttach(self); // REMOTE_CAM
         //Camera.StaticAttach(self); // VIEW_CAM
     }
 
