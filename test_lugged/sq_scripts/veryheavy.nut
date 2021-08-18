@@ -12,17 +12,14 @@ class VeryHeavy extends SqRootScript {
             const turnFactor = 0.9;
             const jumpFactor = 0.5;
             local player = message().container;
-            local g = Property.Get(player, "PhysAttr", "Gravity %");
             if (message().event==eContainsEvent.kContainAdd) {
                 Sound.PlaySchemaAmbient(self,"garlift");
                 DrkInv.AddSpeedControl("VeryHeavyCarry", walkFactor, turnFactor);
-                g *= 1/jumpFactor;
-                Property.Set(player, "PhysAttr", "Gravity %", g);
+                Physics.SetGravity(player, 1.0/jumpFactor);
             } else if (message().event==eContainsEvent.kContainRemove) {
                 Sound.PlaySchemaAmbient(self,"gardrop");
                 DrkInv.RemoveSpeedControl("VeryHeavyCarry");
-                g *= jumpFactor;
-                Property.Set(player, "PhysAttr", "Gravity %", g);
+                Physics.SetGravity(player, 1.0);
             }
         }
     }
