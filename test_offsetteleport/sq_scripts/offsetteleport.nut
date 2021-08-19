@@ -22,6 +22,7 @@ class OffsetTeleportTrap extends SqRootScript
             local pos = Object.Position(ref);
             local fac = Object.Facing(ref);
             Object.Teleport(self, pos+offset, fac, 0);
+            Physics.ControlCurrentPosition(self);
         }
     }
 }
