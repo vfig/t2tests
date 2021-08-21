@@ -1,0 +1,7 @@
+render_material_only 0
+
+#render_pass {
+#    //rgb 1 0 0
+#    //alpha 1
+#    texture $lightmap
+#}
