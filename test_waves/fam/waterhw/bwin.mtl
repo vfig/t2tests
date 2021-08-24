@@ -1,0 +1,11 @@
+render_material_only 0
+
+ani_rate 60
+
+render_pass {
+    texture tex/wavefoam.png
+    //shaded 0
+    alpha func WAVE sine 0.0 1.0 0.0 4000 8
+    uv_mod UOFFSET_WAVE abs_sine 0.0 1.0 0.125 8000
+    uv_mod VOFFSET_WAVE sine 0.0 0.75 0.0 8000
+}
