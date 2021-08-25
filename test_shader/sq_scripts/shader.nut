@@ -45,23 +45,33 @@ class LookAtMeOverlay extends IDarkOverlayHandler
         local w = rx1.tofloat();
         local h = ry1.tofloat();
         local visible = DarkOverlay.GetObjectScreenBounds(m_target, rx1, ry1, rx2, ry2);
-        if (visible) {
-            // encode the bounds into the three shader params (in uv space):
-            //      .x = center x
-            //      .y = center y
-            //      .z = radius
-            // conveniently this will never be 1,1,1 (the default value for
-            // the shader parameter we are hijacking), so the shader can
-            // simply skip the effect when the input is 1,1,1.
-            local x1 = rx1.tofloat();
-            local y1 = ry1.tofloat();
-            local x2 = rx2.tofloat();
-            local y2 = ry2.tofloat();
-            local sx = 0.5*(x1+x2)/w;
-            local sy = 0.5*(y1+y2)/h;
-            local sw = abs(x2-x1)/w;
-            local sh = abs(y2-y1)/h;
-            local sz = 0.5*sqrt(sw*sw+sh*sh);
+        local playerPos = Object.Position(Object.Named("Player"));
+        local targetPos = Object.Position(m_target);
+        local distance = (targetPos-playerPos).Length();
+        const MAX_RANGE = 16.0;
+        const MIN_RANGE = 2.0;
+        local proximity = (MIN_RANGE+MAX_RANGE-distance)/MAX_RANGE;
+        if (proximity<0.0) proximity = 0.0;
+        if (proximity>0.999) proximity = 0.999;
+        if (visible || proximity>0.0) {
+            // encode the bounds into the three shader params:
+            //      .x = center x (in uv space)
+            //      .y = center y (in uv space)
+            //      .z = proximity (0.0-0.999)
+            // make sure this is never 1,1,1 (the default value for
+            // the shader parameter we are hijacking), or the shader
+            // will simply skip the effect.
+            local sx = 0.0;
+            local sy = 0.0;
+            if (visible) {
+                local x1 = rx1.tofloat();
+                local y1 = ry1.tofloat();
+                local x2 = rx2.tofloat();
+                local y2 = ry2.tofloat();
+                sx = 0.5*(x1+x2)/w;
+                sy = 0.5*(y1+y2)/h;
+            }
+            local sz = proximity;
             SetShaderParams(sx,sy,sz);
         } else {
             SetShaderParams(0,0,0);

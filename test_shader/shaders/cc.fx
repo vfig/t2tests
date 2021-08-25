@@ -56,11 +56,10 @@ float4 SatGammaPS(in float2 uv : TEXCOORD0, uniform int bDoSat, uniform int bDoG
 
         float2 aspect = float2(g_fScreenSize.x/g_fScreenSize.y,1.0);
         float2 pos = g_fColorFilter.xy;
-        float radius = g_fColorFilter.z;
-        //float bigness = 1.0-smoothstep(radius,2*radius,dist);
-        float dist = length(uv*aspect-pos*aspect);
-        float centeredness = 1.0-saturate(1.414*length(pos-float2(0.5,0.5)));
-        float modulation = pow(centeredness,3.0);
+        float proximity = g_fColorFilter.z;
+        float2 dist = 2.0*abs(pos-float2(0.5,0.5));
+        float centeredness = 1.0-max(dist.x,dist.y);
+        float modulation = pow(max(centeredness,proximity), 3.0);
 
       #if NOISE_BLUR
         // using g_fColorFilter as our input parameter, to control noise amplitude
@@ -73,7 +72,7 @@ float4 SatGammaPS(in float2 uv : TEXCOORD0, uniform int bDoSat, uniform int bDoG
       #if DRIPS
         // the effect intensity depends on this pixel brightness
         float brightness = (0.299*vColor.r + 0.587*vColor.g + 0.144*vColor.b);
-        float rand = frac(sin(4.0*g_fNoiseTimer)*1000000.0);
+        //float rand = frac(sin(4.0*g_fNoiseTimer)*1000000.0);
         uv += float2(0,brightness)*2.0*modulation;
         uv = fmod(uv, 1.0);
         // and get a different pixel to render
