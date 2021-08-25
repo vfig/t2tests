@@ -45,16 +45,24 @@ float3 Noise(float3 vColor, float2 uv)
 
 float4 SatGammaPS(in float2 uv : TEXCOORD0, uniform int bDoSat, uniform int bDoGamma, uniform int bDoContrBright) : COLOR
 {
+  // Only set one of these to 1!!
+  #define NOISE_BLUR 1
+  #define DRIPS 0
+
     float modulation = (1.0-g_fColorFilter.y);
-    // using g_fColorFilter as our input parameter, to control noise amplitude
-    float3 noise = GenNoise(uv*g_fScreenSize);
     // get this pixel color
     float4 vColor = tex2D(s0, uv);
     // modulate the effect intensity by the this pixel brightness
     float intensity = (0.299*vColor.r + 0.587*vColor.g + 0.144*vColor.b);
+  #if NOISE_BLUR
+    // using g_fColorFilter as our input parameter, to control noise amplitude
+    float3 noise = GenNoise(uv*g_fScreenSize);
     // offset the uvs by the noise
-    ////uv += float2(intensity*20.0,0.0)*noise*modulation;
+    uv += float2(intensity*20.0,0.0)*noise*modulation;
+  #endif
+  #if DRIPS
     uv += float2(0.0,intensity*0.5)*modulation;
+  #endif
     // and get a different pixel to render
     vColor = tex2D(s0, uv);
 
