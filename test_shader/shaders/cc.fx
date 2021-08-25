@@ -42,29 +42,50 @@ float3 Noise(float3 vColor, float2 uv)
     return vColor.xyz + GenNoise(uv);
 }
 
-
 float4 SatGammaPS(in float2 uv : TEXCOORD0, uniform int bDoSat, uniform int bDoGamma, uniform int bDoContrBright) : COLOR
 {
-  // Only set one of these to 1!!
-  #define NOISE_BLUR 1
-  #define DRIPS 0
-
-    float modulation = (1.0-g_fColorFilter.y);
     // get this pixel color
     float4 vColor = tex2D(s0, uv);
-    // modulate the effect intensity by the this pixel brightness
-    float intensity = (0.299*vColor.r + 0.587*vColor.g + 0.144*vColor.b);
-  #if NOISE_BLUR
-    // using g_fColorFilter as our input parameter, to control noise amplitude
-    float3 noise = GenNoise(uv*g_fScreenSize);
-    // offset the uvs by the noise
-    uv += float2(intensity*20.0,0.0)*noise*modulation;
-  #endif
-  #if DRIPS
-    uv += float2(0.0,intensity*0.5)*modulation;
-  #endif
-    // and get a different pixel to render
-    vColor = tex2D(s0, uv);
+    // effect only enabled when color filter is at default color filter values!
+    if (!all(g_fColorFilter.rgb==1)) {
+
+      // Only set one of these to 1!!
+      #define NOISE_BLUR 0
+      #define DRIPS 1
+      #define PIXELATE 0
+
+        float2 aspect = float2(g_fScreenSize.x/g_fScreenSize.y,1.0);
+        float2 pos = g_fColorFilter.xy;
+        float radius = g_fColorFilter.z;
+        //float bigness = 1.0-smoothstep(radius,2*radius,dist);
+        float dist = length(uv*aspect-pos*aspect);
+        float centeredness = 1.0-saturate(1.414*length(pos-float2(0.5,0.5)));
+        float modulation = pow(centeredness,3.0);
+
+      #if NOISE_BLUR
+        // using g_fColorFilter as our input parameter, to control noise amplitude
+        float3 noise = GenNoise(uv*g_fScreenSize);
+        // offset the uvs by the noise
+        uv += float2(0.5,0.0)*50.0*noise*modulation;
+        // and get a different pixel to render
+        vColor = tex2D(s0, uv);
+      #endif
+      #if DRIPS
+        // the effect intensity depends on this pixel brightness
+        float brightness = (0.299*vColor.r + 0.587*vColor.g + 0.144*vColor.b);
+        float rand = frac(sin(4.0*g_fNoiseTimer)*1000000.0);
+        uv += float2(0,brightness)*2.0*modulation;
+        uv = fmod(uv, 1.0);
+        // and get a different pixel to render
+        vColor = tex2D(s0, uv);
+      #endif
+      #if PIXELATE
+        float t = 10.0/modulation;
+        uv = trunc(t*uv)/t;
+        // and get a different pixel to render
+        vColor = tex2D(s0, uv);
+      #endif
+    }
 
     if (bDoSat)
     {
