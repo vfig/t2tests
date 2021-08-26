@@ -130,6 +130,11 @@ class JointTest extends SqRootScript
         "Joint4AnimS", "Joint5AnimS", "Joint6AnimS",
     ];
 
+    static JOINT_POS_FIELD = [
+    "Joint 1", "Joint 2", "Joint 3",
+    "Joint 4", "Joint 5", "Joint 6",
+    ];
+
     function dump_joints() {
         local anims = GetProperty("StTweqJoints", "AnimS");
         print("AnimS: "+anims);
@@ -141,38 +146,85 @@ class JointTest extends SqRootScript
             local janims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
             print("  AnimS: "+janims);
             print("  rate,lo,hi: "+jvalue);
+            local jpos = GetProperty("JointPos", JOINT_POS_FIELD[j]);
+            print("  pos: "+jpos);
             local ref = Object.Named(JOINT_REFS[j]);
             local marker = Object.Named(JOINT_MARKERS[j]);
             local pos = vector();
             local fac = vector();
             local ok = Object.CalcRelTransform(ref, marker, pos, fac, 0, 0);
-            print("  pos: "+pos);
-            print("  fac: "+fac);
+            print("  marker pos: "+pos);
+            print("  marker fac: "+fac);
         }
 
     }
     function setJoint(rate,lo,hi) {
-        Property.Set(self, "CfgTweqJoints", JOINT_VALUE_FIELD[0], vector(rate,lo,hi));
-        Property.Set(self, "StTweqJoints", JOINT_STATE_ANIM_FIELD[0], TWEQ_AS_ONOFF);
+        SetProperty("CfgTweqJoints", JOINT_VALUE_FIELD[0], vector(rate,lo,hi));
+        SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[0], TWEQ_AS_ONOFF);
     }
 
-    function startTweqing() {
-        Property.Set(self, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
+    function startTweq() {
+        SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
     }
-    function stopTweqing() {
-        Property.Set(self, "StTweqJoints", "AnimS", 0);
+    function stopTweq() {
+        SetProperty("StTweqJoints", "AnimS", 0);
     }
 
     function OnTurnOn() {
-        print(message().message);
-        setJoint(15.0,0.0,90.0);
-        startTweqing();
+        print(message().message + " from " + Object.GetName(message().from));
+        local goUp = (message().from==Object.Named("Up"));
+        local goDown = (message().from==Object.Named("Down"));
+        local stop = (message().from==Object.Named("Stop"));
+        local res = (message().from==Object.Named("Resume"));
+
         dump_joints();
+
+        if (goUp) {
+            // rate is decadegrees/sec
+            // i.e. rate 5.0 == 50 degrees/sec
+            setJoint(5.0,0.0,90.0);
+            startTweq();
+        } else if (goDown) {
+            local pos = GetProperty("JointPos", JOINT_POS_FIELD[0]);
+            local lo = 5.0;
+            local hi = pos;
+            //local duration = 2000; // ms
+            //local rate = (lo-hi)*100.0/duration
+            local degrees_per_second = 50.0;
+            local rate = -degrees_per_second/10.0;
+            setJoint(rate,lo,hi);
+            startTweq();
+        } else if (stop) {
+            local flag = GetProperty("StTweqJoints", "AnimS");
+            flag = flag&~TWEQ_AS_ONOFF;
+            SetProperty("StTweqJoints", "AnimS", flag);
+            //stopTweq();
+        } else if (res) {
+            local flag = GetProperty("StTweqJoints", "AnimS");
+            flag = flag|TWEQ_AS_ONOFF;
+            SetProperty("StTweqJoints", "AnimS", flag);
+        }
     }
 
-    function OnTurnOff() {
+    function OnTweqComplete() {
         print(message().message);
-        startTweqing();
-        dump_joints();
-    }
+        if (message().Type==eTweqType.kTweqTypeJoints) {
+            if (message().Dir==eTweqDirection.kTweqDirForward)
+                print("  Dir: Forward");
+            if (message().Dir==eTweqDirection.kTweqDirReverse)
+                print("  Dir: Reverse");
+            if (message().Op==eTweqOperation.kTweqOpKillAll)
+                print("  Op: KillAll");
+            if (message().Op==eTweqOperation.kTweqOpRemoveTweq)
+                print("  Op: Remove");
+            if (message().Op==eTweqOperation.kTweqOpHaltTweq)
+                print("  Op: Halt");
+            if (message().Op==eTweqOperation.kTweqOpStatusQuo)
+                print("  Op: StatusQuo");
+            if (message().Op==eTweqOperation.kTweqOpSlayAll)
+                print("  Op: SlayAll");
+            if (message().Op==eTweqOperation.kTweqOpFrameEvent)
+                print("  Op: Frame");
+        }
+   }
 }
