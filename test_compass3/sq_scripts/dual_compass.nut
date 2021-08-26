@@ -1,4 +1,4 @@
-class DualCompass extends SqRootScript
+class DISABLED_DualCompass extends SqRootScript
 {
     static POSES = {
         // POSE       eye.x   eye.y   top.x   bot.x
@@ -55,6 +55,7 @@ class DualCompass extends SqRootScript
         local lo = 30.0+ (forward ? from : to);
         local hi = 30.0+ (forward ? to : from);
         local anim = TWEQ_AS_ONOFF|TWEQ_AS_RESYNCH;
+        if (!forward) rate = -rate;
         if (!forward) anim = anim|TWEQ_AS_REVERSE;
         Property.Set(self, "CfgTweqJoints", JOINT_VALUE_FIELD[j], vector(rate,lo,hi));
         Property.Set(self, "StTweqJoints", JOINT_STATE_ANIM_FIELD[j], anim);
@@ -113,5 +114,65 @@ class DualCompass extends SqRootScript
             startTweqing();
             dump_joints();
         }
+    }
+}
+
+
+class JointTest extends SqRootScript
+{
+    static JOINT_VALUE_FIELD = [
+        "    rate-low-high", "    rate-low-high2", "    rate-low-high3",
+        "    rate-low-high4", "    rate-low-high5", "    rate-low-high6",
+    ];
+     //: bitflags    // flags: "On", "Reverse", "ReSynch", "GoEdge", "LapOne"
+    static JOINT_STATE_ANIM_FIELD = [
+        "Joint1AnimS", "Joint2AnimS", "Joint3AnimS",
+        "Joint4AnimS", "Joint5AnimS", "Joint6AnimS",
+    ];
+
+    function dump_joints() {
+        local anims = GetProperty("StTweqJoints", "AnimS");
+        print("AnimS: "+anims);
+        local JOINT_REFS = ["JointTestRef1"];
+        local JOINT_MARKERS = ["JointTestJoint1"];
+        for (local j=0; j<1; ++j) {
+            print("Joint "+j+":")
+            local jvalue = GetProperty("CfgTweqJoints", JOINT_VALUE_FIELD[j]);
+            local janims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
+            print("  AnimS: "+janims);
+            print("  rate,lo,hi: "+jvalue);
+            local ref = Object.Named(JOINT_REFS[j]);
+            local marker = Object.Named(JOINT_MARKERS[j]);
+            local pos = vector();
+            local fac = vector();
+            local ok = Object.CalcRelTransform(ref, marker, pos, fac, 0, 0);
+            print("  pos: "+pos);
+            print("  fac: "+fac);
+        }
+
+    }
+    function setJoint(rate,lo,hi) {
+        Property.Set(self, "CfgTweqJoints", JOINT_VALUE_FIELD[0], vector(rate,lo,hi));
+        Property.Set(self, "StTweqJoints", JOINT_STATE_ANIM_FIELD[0], TWEQ_AS_ONOFF);
+    }
+
+    function startTweqing() {
+        Property.Set(self, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
+    }
+    function stopTweqing() {
+        Property.Set(self, "StTweqJoints", "AnimS", 0);
+    }
+
+    function OnTurnOn() {
+        print(message().message);
+        setJoint(15.0,0.0,90.0);
+        startTweqing();
+        dump_joints();
+    }
+
+    function OnTurnOff() {
+        print(message().message);
+        startTweqing();
+        dump_joints();
     }
 }
