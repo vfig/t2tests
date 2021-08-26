@@ -12,6 +12,19 @@ typedef uint32_t u32;
 typedef int64_t i64;
 typedef uint64_t u64;
 
+typedef struct float3 {
+    float x,y,z;
+} float3;
+#define float3(x,y,z) ((struct float3){x,y,z})
+
+typedef struct float3x3 {
+    float m00,m01,m02;
+    float m10,m11,m12;
+    float m20,m21,m22;
+} float3x3;
+#define float3x3(m00,m01,m02,m10,m11,m12,m20,m21,m22) \
+    ((struct float3x3){m00,m01,m02,m10,m11,m12,m20,m21,m22})
+
 void die(const char *message) {
     fprintf(stderr, "%s", message);
     exit(99);
@@ -449,11 +462,210 @@ static struct EFile E_DATA={
     }},
 };
 
+const u32 MD_MAGIC = *((u32*)"LGMD");
+
+#pragma pack(push,1)
+// FIXME: remove these member name comments
+struct MDFile {
+    u32 magic;  //id
+    u32 version; //ver
+    u8 name[8];   // not null-terminated! //name
+    float bsphere_radius; //radius
+    float max_poly_radius; //max_pgon_radius
+    float3 bbox_max; //bmax
+    float3 bbox_min; //bmin
+    float3 origin;  //pcen
+    u16 poly_count; //pgons
+    u16 vert_count; //verts
+    u16 param_count; //parms;
+    u8 mat_count; //mats
+    u8 vcall_count; //vcals
+    u8 vhot_count; //vhots
+    u8 model_count; //subobjs
+    u32 model_offset;
+    u32 mat_offset;
+    u32 uv_offset;
+    u32 vhot_offset;
+    u32 point_offset;
+    u32 light_offset;
+    u32 normal_offset;
+    u32 poly_offset;
+    u32 node_offset;
+    u32 model_size; // zero on disk, calculated during load.
+};
+
+enum MDJointType {
+    MD_JOINT_FIXED=0,
+    MD_JOINT_ROTATING=1,
+    MD_JOINT_TRANSLATING=2,
+};
+
+struct MDTransform {
+    float3x3 a; // 3D affine transformation
+    float3 t; // translation
+};
+
+struct MDModel {
+    u8 name[8]; // not null-terminated!
+    u8 joint_type; // MDJointType.
+    i32 param;
+    float joint_value_min;
+    float joint_value_max;
+    struct MDTransform transform;
+    i16 child_index; // -1 if no children.
+    i16 next_index; // -1 if last sibling.
+    u16 vhot_index;
+    u16 vhot_count;
+    u16 point_index;
+    u16 point_count;
+    u16 light_index;
+    u16 light_count;
+    u16 normal_index;
+    u16 normal_count;
+    u16 node_index;
+    u16 node_count;
+};
+
+enum MDMaterialType {
+    MD_MATERIAL_TEXTURE=0,
+    MD_MATERIAL_COLOR=1,
+};
+
+struct MDMaterial {
+    u8 name[16]; // not null-terminated!
+    u8 mat_type;
+    u8 slot;
+    union {
+        // mat_type=MD_MATERIAL_TEXTURE:
+        u32 texture_handle;
+        // mat_type=MD_MATERIAL_COLOR:
+        u32 color; // 0xAARRGGBB
+    };
+    union {
+        // mat_type=MD_MATERIAL_TEXTURE:
+        float uv_scale;
+        // mat_type=MD_MATERIAL_COLOR:
+        u32 palette_index;
+    };
+};
+#pragma pack(pop)
+
+void dump_mdfile(struct MDFile *m) {
+    printf("magic: %.*s\n", sizeof(m->magic), (char *)&m->magic);
+    printf("version: %lu\n", m->version);
+    printf("name: %.*s\n", sizeof(m->name), m->name);
+    printf("bsphere_radius: %f\n", m->bsphere_radius);
+    printf("max_poly_radius: %f\n", m->max_poly_radius);
+    printf("bbox_max: %f,%f,%f\n", m->bbox_max.x, m->bbox_max.y, m->bbox_max.z);
+    printf("bbox_min: %f,%f,%f\n", m->bbox_min.x, m->bbox_min.y, m->bbox_min.z);
+    printf("origin: %f,%f,%f\n", m->origin.x, m->origin.y, m->origin.z);
+    printf("poly_count: %u\n", m->poly_count);
+    printf("vert_count: %u\n", m->vert_count);
+    printf("param_count: %u\n", m->param_count);
+    printf("mat_count: %u\n", m->mat_count);
+    printf("vcall_count: %u\n", m->vcall_count);
+    printf("vhot_count: %u\n", m->vhot_count);
+    printf("model_count: %u\n", m->model_count);
+    printf("model_offset: 0x%lx\n", m->model_offset);
+    printf("mat_offset: 0x%lx\n", m->mat_offset);
+    printf("uv_offset: 0x%lx\n", m->uv_offset);
+    printf("vhot_offset: 0x%lx\n", m->vhot_offset);
+    printf("point_offset: 0x%lx\n", m->point_offset);
+    printf("light_offset: 0x%lx\n", m->light_offset);
+    printf("normal_offset: 0x%lx\n", m->normal_offset);
+    printf("poly_offset: 0x%lx\n", m->poly_offset);
+    printf("node_offset: 0x%lx\n", m->node_offset);
+    printf("model_size: %lu\n", m->model_size);
+    printf("\n");
+}
+
+void dump_mdmodel(struct MDModel *m) {
+    const char *joint_type_names[] = {
+        "MD_JOINT_FIXED",
+        "MD_JOINT_ROTATING",
+        "MD_JOINT_TRANSLATING",
+    };
+    printf("name: %.*s\n", sizeof(m->name), m->name);
+    printf("joint_type: %s\n", joint_type_names[m->joint_type]);
+    printf("param: %ld\n", m->param);
+    printf("joint_value_min: %f\n", m->joint_value_min);
+    printf("joint_value_max: %f\n", m->joint_value_max);
+    printf("transform: %f %f %f\n"
+           "           %f %f %f\n"
+           "           %f %f %f\n"
+           "           %f,%f,%f\n",
+           m->transform.a.m00, m->transform.a.m01, m->transform.a.m02,
+           m->transform.a.m10, m->transform.a.m11, m->transform.a.m22,
+           m->transform.a.m20, m->transform.a.m21, m->transform.a.m22,
+           m->transform.t.x, m->transform.t.y, m->transform.t.z);
+    printf("child_index: %d\n", m->child_index);
+    printf("next_index: %d\n", m->next_index);
+    printf("vhot_index: %u\n", m->vhot_index);
+    printf("vhot_count: %u\n", m->vhot_count);
+    printf("point_index: %u\n", m->point_index);
+    printf("point_count: %u\n", m->point_count);
+    printf("light_index: %u\n", m->light_index);
+    printf("light_count: %u\n", m->light_count);
+    printf("normal_index: %u\n", m->normal_index);
+    printf("normal_count: %u\n", m->normal_count);
+    printf("node_index: %u\n", m->node_index);
+    printf("node_count: %u\n", m->node_count);
+    printf("\n");
+}
+
+void dump_mdmaterial(struct MDMaterial *m) {
+    const char *mat_type_names[] = {
+        "MD_MATERIAL_TEXTURE",
+        "MD_MATERIAL_COLOR",
+    };
+    printf("name: %.*s\n", sizeof(m->name), m->name);
+    printf("mat_type: %s\n", mat_type_names[m->mat_type]);
+    printf("slot: %u\n", m->slot);
+    if (m->mat_type==MD_MATERIAL_TEXTURE) {
+        printf("texture_handle: %lu\n", m->texture_handle);
+        printf("uv_scale: %f\n", m->uv_scale);
+    } else {
+        printf("color: %u %u %u %u (rgba)\n",
+            ((m->color>>16)&0xff), ((m->color>>8)&0xff),
+            (m->color&0xff), ((m->color>>24)&0xff) );
+        printf("palette_index: %lu\n", m->palette_index);
+    }
+    printf("\n");
+}
+
+void read_model(const char *filename) {
+    struct MDFile mdfile = {0};
+    struct MDModel mdmodel = {0};
+    struct MDMaterial mdmat = {0};
+    FILE *f = fopen(filename, "rb");
+    if (!f) die("cannot open file!");
+    // TODO: actually deal with file errors, lol
+    fread(&mdfile, sizeof(mdfile), 1, f);
+    dump_mdfile(&mdfile);
+    fseek(f, mdfile.model_offset, SEEK_SET);
+    for (int i=0; i<(int)mdfile.model_count; ++i) {
+        fread(&mdmodel, sizeof(mdmodel), 1, f);
+        printf("Model %d:\n", i);
+        dump_mdmodel(&mdmodel);
+    }
+    fseek(f, mdfile.mat_offset, SEEK_SET);
+    for (int i=0; i<(int)mdfile.mat_count; ++i) {
+        fread(&mdmat, sizeof(mdmat), 1, f);
+        printf("Material %d:\n", i);
+        dump_mdmaterial(&mdmat);
+    }
+    fclose(f);
+
+
+}
+
 void convert_to_bin(struct EFile *efile) {
+    printf("%04lx\n", MD_MAGIC);
     die("not implemented!\n");
 }
 
 int main(int arc, char **argv) {
-    convert_to_bin(&E_DATA);
+    read_model("compass2.bin");
+    //convert_to_bin(&E_DATA);
     return 0;
 }
