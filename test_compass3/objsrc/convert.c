@@ -30,6 +30,8 @@ void die(const char *message) {
     exit(99);
 }
 
+
+
 struct EUV {
     float u, v;
 };
@@ -548,7 +550,69 @@ struct MDMaterial {
         u32 palette_index;
     };
 };
+
+struct MDUV {
+    float u, v;
+};
+
+struct MDVhot {
+    u32 index;
+    float3 origin;
+};
+
+struct MDLight {
+    u16 mat_index;
+    u16 vert_index;
+    u32 packed_normal;
+};
+
+enum MDPolyRenderType {
+    MD_POLY_RENDER_NONE = 0,
+    MD_POLY_RENDER_SOLID = 1,
+    MD_POLY_RENDER_WIRE = 2,
+    MD_POLY_RENDER_TEXTURE = 3,
+};
+#define MD_POLY_RENDER_MASK 0x7U;
+
+struct MDPoly {
+    u16 index;
+    union {
+        u16 texture_handle; // slot??
+        u16 palette_index;
+    };
+    u8 type;
+    u8 vert_count;
+    u16 normal_index;
+    float plane_dist;
+    u16 indices[0];
+};
 #pragma pack(pop)
+
+float3 mdlight_unpack_normal(u32 packed_normal) {
+    float3 n;
+    n.x = (i16)((packed_normal>>16)&0xffc0)/16384.0;
+    n.y = (i16)((packed_normal>>6)&0xffc0)/16384.0;
+    n.z = (i16)((packed_normal<<4)&0xffc0)/16384.0;
+    return n;
+}
+
+int mdpoly_render_type(struct MDPoly *m) {
+    return (m->type)&MD_POLY_RENDER_MASK;
+}
+
+size_t mdpoly_size(int version, struct MDPoly *m) {
+    size_t size = sizeof(struct MDPoly);
+    size += m->vert_count*sizeof(u16); // vertex indexes.
+    size += m->vert_count*sizeof(u16); // light indexes.
+    if (mdpoly_render_type(m)==MD_POLY_RENDER_TEXTURE) {
+        size += m->vert_count*sizeof(u16); // uv indexes.
+    }
+    if (version==4) {
+        size += 1;
+    }
+    return size;
+}
+
 
 void dump_mdfile(struct MDFile *m) {
     printf("magic: %.*s\n", sizeof(m->magic), (char *)&m->magic);
@@ -633,29 +697,130 @@ void dump_mdmaterial(struct MDMaterial *m) {
     printf("\n");
 }
 
+void dump_mdlight(struct MDLight *m) {
+    float3 normal = mdlight_unpack_normal(m->packed_normal);
+    printf("mat %u; ", m->mat_index);
+    printf("vert %u; ", m->vert_index);
+    printf("normal %f,%f,%f\n", normal.x, normal.y, normal.z);
+}
+
+void dump_mdpoly(struct MDPoly *m) {
+    const char *render_types[] = {
+        "MD_POLY_RENDER_NONE",
+        "MD_POLY_RENDER_SOLID",
+        "MD_POLY_RENDER_WIRE",
+        "MD_POLY_RENDER_TEXTURE",
+    };
+    printf("index: %u\n", m->index);
+    if (mdpoly_render_type(m)==MD_POLY_RENDER_TEXTURE) {
+        printf("texture_handle: %u\n", m->texture_handle);
+    } else {
+        printf("palette_index: %u\n", m->palette_index);
+    }
+    printf("render type: %s\n", render_types[mdpoly_render_type(m)]);
+    //u8 type; TODO: other type bits
+    printf("vert_count: %u\n", m->vert_count);
+    printf("normal_index: %u\n", m->normal_index);
+    printf("plane_dist: %f\n", m->plane_dist);
+    for (int i=0; i<(int)m->vert_count; ++i) {
+        printf("vert %d: %u\n", i, m->indices[i]);
+    }
+    for (int i=0; i<(int)m->vert_count; ++i) {
+        printf("light %d: %u\n", i, m->indices[m->vert_count+i]);
+    }
+    if (mdpoly_render_type(m)==MD_POLY_RENDER_TEXTURE) {
+        for (int i=0; i<(int)m->vert_count; ++i) {
+            printf("uv %d: %u\n", i, m->indices[2*m->vert_count+i]);
+        }
+    }
+}
+
 void read_model(const char *filename) {
-    struct MDFile mdfile = {0};
-    struct MDModel mdmodel = {0};
-    struct MDMaterial mdmat = {0};
+    void *buf;
     FILE *f = fopen(filename, "rb");
     if (!f) die("cannot open file!");
     // TODO: actually deal with file errors, lol
-    fread(&mdfile, sizeof(mdfile), 1, f);
-    dump_mdfile(&mdfile);
-    fseek(f, mdfile.model_offset, SEEK_SET);
-    for (int i=0; i<(int)mdfile.model_count; ++i) {
-        fread(&mdmodel, sizeof(mdmodel), 1, f);
-        printf("Model %d:\n", i);
-        dump_mdmodel(&mdmodel);
-    }
-    fseek(f, mdfile.mat_offset, SEEK_SET);
-    for (int i=0; i<(int)mdfile.mat_count; ++i) {
-        fread(&mdmat, sizeof(mdmat), 1, f);
-        printf("Material %d:\n", i);
-        dump_mdmaterial(&mdmat);
-    }
+    fseek(f, 0, SEEK_END);
+    size_t buf_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    buf = malloc(buf_size);
+    // TODO: actually deal with file errors, lol
+    fread(buf, buf_size, 1, f);
     fclose(f);
 
+    struct MDFile *mdfile = (struct MDFile *)buf;
+    dump_mdfile(mdfile);
+
+    struct MDModel *mdmodel = (struct MDModel *)(buf+mdfile->model_offset);
+    for (int i=0; i<(int)mdfile->model_count; ++i) {
+        printf("Model %d:\n", i);
+        dump_mdmodel(&mdmodel[i]);
+    }
+
+    struct MDMaterial *mdmat = (struct MDMaterial *)(buf+mdfile->mat_offset);
+    for (int i=0; i<(int)mdfile->mat_count; ++i) {
+        printf("Material %d:\n", i);
+        dump_mdmaterial(&mdmat[i]);
+    }
+
+    struct MDUV *mduv = (struct MDUV *)(buf+mdfile->uv_offset);
+    int uv_count = (int)((mdfile->vhot_offset-mdfile->uv_offset)
+        / sizeof(struct MDUV));
+    for (int i=0; i<uv_count; ++i) {
+        printf("UV %d: %f,%f\n", i, mduv[i].u, mduv[i].v);
+    }
+    if (uv_count) printf("\n");
+
+    struct MDVhot *mdvhot = (struct MDVhot *)(buf+mdfile->vhot_offset);
+    int vhot_count = (int)mdfile->vhot_count;
+    for (int i=0; i<vhot_count; ++i) {
+        printf("Vhot %d: %u; %f,%f\n", i,
+            mdvhot[i].index, mdvhot[i].origin.x, mdvhot[i].origin.y);
+    }
+    if (vhot_count>0) printf("\n");
+
+    struct MDLight *mdlight = (struct MDLight *)(buf+mdfile->light_offset);
+    int light_count = (int)((mdfile->normal_offset-mdfile->light_offset)
+        / sizeof(struct MDLight));
+    for (int i=0; i<light_count; ++i) {
+        printf("Light %d: ", i);
+        dump_mdlight(&mdlight[i]);
+    }
+    if (light_count) printf("\n");
+
+    // ugh, these are variable length records packed end to end. and in v4
+    // they have one extra trailing byte after the arrays that wasnt there in v3.
+    // so this is a bit gross:
+    struct MDPoly *mdpoly = (struct MDPoly *)(buf+mdfile->poly_offset);
+    for (int i=0; i<(int)mdfile->poly_count;
+        mdpoly=(void *)mdpoly+mdpoly_size(mdfile->version, mdpoly), ++i)
+    {
+        printf("Poly %d:\n", i);
+        printf("offset: 0x%p\n", ((void *)mdpoly-buf));
+        dump_mdpoly(mdpoly);
+    }
+
+    /*
+    so, the whole idea of writing this is to learn the format well enough to
+    generate one, but _without_ a bsp tree: like, for each submodel, one leaf
+    node with all the polys in it. i _think_ it should work! might be rather
+    slower for 64k poly models being hit tested, but on low poly objects it
+    should actually be much better.
+    */
+
+
+    free(buf);
+
+    // still to be dumped:
+
+    // u16 vert_count; //verts
+    // u16 param_count; //parms;
+    // u8 vcall_count; //vcals
+
+    // u32 point_offset;
+    // u32 light_offset;
+    // u32 normal_offset;
+    // u32 node_offset;
 
 }
 
