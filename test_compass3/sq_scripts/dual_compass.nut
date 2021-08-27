@@ -196,12 +196,13 @@ class DualCompassInventory extends DualCompass
     function OnInvSelect() {
         print(message().message);
         SetData("DualCompassAnimating", true);
-        SetOneShotTimer("AnimateAgain", 1.0);
+        SetOneShotTimer("AnimateAgain", 3.0);
     }
 
     function OnInvDeSelect() {
         print(message().message);
         SetData("DualCompassAnimating", false);
+        AnimateToPose("reset");
     }
 
     function OnPoseCompleted() {
@@ -209,7 +210,7 @@ class DualCompassInventory extends DualCompass
         local keepAnimating = GetData("DualCompassAnimating");
         if (keepAnimating) {
             local r = (rand().tofloat()/RAND_MAX);
-            local delay = 0.8+2.0*r;
+            local delay = 1.0+2.5*r;
             SetOneShotTimer("AnimateAgain", delay);
         }
     }
