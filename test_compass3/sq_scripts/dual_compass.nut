@@ -257,7 +257,8 @@ class DualCompassTest extends SqRootScript
         }
         print("");
         print("SET POSE: " + poseName);
-        const eye_duration = 150; // ms
+        // TODO: when first 'waking up', this should be slower.
+        const eye_speed = 400; // degrees/second
         local pose = POSES[poseName];
         local lo = [0,0,0,0];
         local hi = [0,0,0,0];
@@ -276,7 +277,7 @@ class DualCompassTest extends SqRootScript
             local dist = fabs(hi[j]-lo[j]);
             if (dist>max_distance) max_distance = dist;
         }
-        local eye_rate = max_distance/eye_duration*100.0;
+        local eye_rate = eye_speed/10.0;
         for (local j=0; j<4; ++j) {
             local dist = fabs(hi[j]-lo[j]);
             rate[j] *= eye_rate*dist/max_distance;
