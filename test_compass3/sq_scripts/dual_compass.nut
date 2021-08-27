@@ -18,7 +18,7 @@ class DISABLED_DualCompass extends SqRootScript
     //
     // but for a first pass we just want continually animating joint tweqs!
 
-    static JOINT_VALUE_FIELD = [
+    static JOINT_RANGE_FIELD = [
         "    rate-low-high", "    rate-low-high2", "    rate-low-high3",
         "    rate-low-high4", "    rate-low-high5", "    rate-low-high6",
     ];
@@ -33,10 +33,10 @@ class DISABLED_DualCompass extends SqRootScript
         print("AnimS: "+anims);
         for (local j=0; j<4; ++j) {
             print("Joint "+j+":")
-            local jvalue = GetProperty("CfgTweqJoints", JOINT_VALUE_FIELD[j]);
+            local jrange = GetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j]);
             local janims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
             print("  AnimS: "+janims);
-            print("  rate,lo,hi: "+jvalue);
+            print("  rate,lo,hi: "+jrange);
             local pos = vector();
             local fac = vector();
             local ok = Object.CalcRelTransform(self, self, pos, fac, 3, j+1);
@@ -57,7 +57,7 @@ class DISABLED_DualCompass extends SqRootScript
         local anim = TWEQ_AS_ONOFF|TWEQ_AS_RESYNCH;
         if (!forward) rate = -rate;
         if (!forward) anim = anim|TWEQ_AS_REVERSE;
-        Property.Set(self, "CfgTweqJoints", JOINT_VALUE_FIELD[j], vector(rate,lo,hi));
+        Property.Set(self, "CfgTweqJoints", JOINT_RANGE_FIELD[j], vector(rate,lo,hi));
         Property.Set(self, "StTweqJoints", JOINT_STATE_ANIM_FIELD[j], anim);
         //Property.Set(self, "StTweqJoints", JOINT_STATE_FOO_FIELD[j], anim);
         print("  " + (j+1) + ": " + rate + "," + lo + "," + hi + " " + anim);
@@ -120,7 +120,7 @@ class DISABLED_DualCompass extends SqRootScript
 
 class JointTest extends SqRootScript
 {
-    static JOINT_VALUE_FIELD = [
+    static JOINT_RANGE_FIELD = [
         "    rate-low-high", "    rate-low-high2", "    rate-low-high3",
         "    rate-low-high4", "    rate-low-high5", "    rate-low-high6",
     ];
@@ -131,8 +131,8 @@ class JointTest extends SqRootScript
     ];
 
     static JOINT_POS_FIELD = [
-    "Joint 1", "Joint 2", "Joint 3",
-    "Joint 4", "Joint 5", "Joint 6",
+        "Joint 1", "Joint 2", "Joint 3",
+        "Joint 4", "Joint 5", "Joint 6",
     ];
 
     function dump_joints() {
@@ -142,12 +142,12 @@ class JointTest extends SqRootScript
         local JOINT_MARKERS = ["JointTestJoint1"];
         for (local j=0; j<1; ++j) {
             print("Joint "+j+":")
-            local jvalue = GetProperty("CfgTweqJoints", JOINT_VALUE_FIELD[j]);
+            local jrange = GetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j]);
             local janims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
             print("  AnimS: "+janims);
-            print("  rate,lo,hi: "+jvalue);
-            local jpos = GetProperty("JointPos", JOINT_POS_FIELD[j]);
-            print("  pos: "+jpos);
+            print("  rate,lo,hi: "+jrange);
+            local jvalue = GetProperty("JointPos", JOINT_POS_FIELD[j]);
+            print("  pos: "+jvalue);
             local ref = Object.Named(JOINT_REFS[j]);
             local marker = Object.Named(JOINT_MARKERS[j]);
             local pos = vector();
@@ -159,7 +159,7 @@ class JointTest extends SqRootScript
 
     }
     function setJoint(rate,lo,hi) {
-        SetProperty("CfgTweqJoints", JOINT_VALUE_FIELD[0], vector(rate,lo,hi));
+        SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[0], vector(rate,lo,hi));
         SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[0], TWEQ_AS_ONOFF);
     }
 
@@ -227,4 +227,95 @@ class JointTest extends SqRootScript
                 print("  Op: Frame");
         }
    }
+}
+
+class DualCompassTest extends SqRootScript
+{
+    static POSES = {
+        // POSE       eye.y   eye.x   top.x   bot.x
+        reset     = [  0.00,   0.00,   0.00,   0.00],
+        blink     = [999.99, 999.99,  20.00,  20.00], // ignore eye.x and eye.y
+        ahead     = [  0.34,  -5.71, -25.71,  34.29],
+        left      = [-26.88,   4.47, -15.53,  44.47],
+        right     = [ 26.92,  -3.18, -23.18,  36.82],
+        upleft    = [ -9.00, -23.82, -43.82,  16.18],
+        upright   = [ 19.08, -23.73, -43.73,  16.27],
+        downleft  = [ -8.82,  12.55,  -7.45,  50.00],
+        downright = [ 20.52,  23.91,   3.91,  50.00],
+        // TODO: up, down
+    };
+
+    function OnTurnOn() {
+        local poseName = Property.Get(message().from, "DesignNote");
+        if (!(poseName in POSES)) {
+            print("ERROR: unknown pose '"+poseName+"'");
+            return;
+        }
+        if (poseName=="blink") {
+            print("TODO: special-case blink!");
+            return;
+        }
+        print("");
+        print("SET POSE: " + poseName);
+        const eye_duration = 150; // ms
+        local pose = POSES[poseName];
+        local lo = [0,0,0,0];
+        local hi = [0,0,0,0];
+        local rate = [0,0,0,0];
+        // Assign low and high tweq values.
+        for (local j=0; j<4; ++j) {
+            local target = pose[j];
+            local value = GetProperty("JointPos", JOINT_POS_FIELD[j]);
+            lo[j] = (target<value) ? target : value;
+            hi[j] = (target>value) ? target : value;
+            rate[j] = (target>value) ? 1.0 : -1.0;
+        }
+        // Adjust rates so all joints complete simultaneously.
+        local max_distance = 0;
+        for (local j=0; j<4; ++j) {
+            local dist = fabs(hi[j]-lo[j]);
+            if (dist>max_distance) max_distance = dist;
+        }
+        local eye_rate = max_distance/eye_duration*100.0;
+        for (local j=0; j<4; ++j) {
+            local dist = fabs(hi[j]-lo[j]);
+            rate[j] *= eye_rate*dist/max_distance;
+        }
+        // Update the properties.
+        for (local j=0; j<4; ++j) {
+            SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j],
+                vector(rate[j],lo[j],hi[j]));
+            SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j],
+                TWEQ_AS_ONOFF);
+        }
+        SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
+        dump_joints();
+    }
+
+    static JOINT_RANGE_FIELD = [
+        "    rate-low-high", "    rate-low-high2", "    rate-low-high3",
+        "    rate-low-high4", "    rate-low-high5", "    rate-low-high6",
+    ];
+    static JOINT_STATE_ANIM_FIELD = [
+        "Joint1AnimS", "Joint2AnimS", "Joint3AnimS",
+        "Joint4AnimS", "Joint5AnimS", "Joint6AnimS",
+    ];
+    static JOINT_POS_FIELD = [
+        "Joint 1", "Joint 2", "Joint 3",
+        "Joint 4", "Joint 5", "Joint 6",
+    ];
+
+    function dump_joints() {
+        local anims = GetProperty("StTweqJoints", "AnimS");
+        print("AnimS: "+anims);
+        for (local j=0; j<4; ++j) {
+            print("Joint "+j+":")
+            local jrange = GetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j]);
+            local janims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
+            print("  AnimS: "+janims);
+            print("  rate,lo,hi: "+jrange);
+            local jvalue = GetProperty("JointPos", JOINT_POS_FIELD[j]);
+            print("  pos: "+jvalue);
+        }
+    }
 }
