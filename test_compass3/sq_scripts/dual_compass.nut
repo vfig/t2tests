@@ -251,20 +251,18 @@ class DualCompassTest extends SqRootScript
             print("ERROR: unknown pose '"+poseName+"'");
             return;
         }
-        if (poseName=="blink") {
-            print("TODO: special-case blink!");
-            return;
-        }
         print("");
         print("SET POSE: " + poseName);
+        local blink = (poseName=="blink");
+        local min_joint = blink ? 2 : 0;
         // TODO: when first 'waking up', this should be slower.
-        const eye_speed = 400; // degrees/second
+        local eye_speed = blink ? 800 : 400; // degrees/second
         local pose = POSES[poseName];
+        local rate = [0,0,0,0];
         local lo = [0,0,0,0];
         local hi = [0,0,0,0];
-        local rate = [0,0,0,0];
         // Assign low and high tweq values.
-        for (local j=0; j<4; ++j) {
+        for (local j=min_joint; j<4; ++j) {
             local target = pose[j];
             local value = GetProperty("JointPos", JOINT_POS_FIELD[j]);
             lo[j] = (target<value) ? target : value;
@@ -273,26 +271,34 @@ class DualCompassTest extends SqRootScript
         }
         // Adjust rates so all joints complete simultaneously.
         local max_distance = 0;
-        for (local j=0; j<4; ++j) {
+        for (local j=min_joint; j<4; ++j) {
             local dist = fabs(hi[j]-lo[j]);
             if (dist>max_distance) max_distance = dist;
         }
         local eye_rate = eye_speed/10.0;
-        for (local j=0; j<4; ++j) {
+        for (local j=min_joint; j<4; ++j) {
             local dist = fabs(hi[j]-lo[j]);
             rate[j] *= eye_rate*dist/max_distance;
         }
-        // Update the properties.
+        // Update the properties (for all joints).
+        local cfg_flag = TWEQ_AC_SIM;
+        if (blink) cfg_flag = cfg_flag|TWEQ_AC_1BOUNCE;
         for (local j=0; j<4; ++j) {
+            SetProperty("CfgTweqJoints", JOINT_ANIM_FIELD[j],
+                cfg_flag);
             SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j],
                 vector(rate[j],lo[j],hi[j]));
             SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j],
                 TWEQ_AS_ONOFF);
         }
+        SetProperty("CfgTweqJoints", "AnimC", cfg_flag);
         SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
         dump_joints();
     }
-
+    static JOINT_ANIM_FIELD = [
+        "Joint1AnimC", "Joint2AnimC", "Joint3AnimC",
+        "Joint4AnimC", "Joint5AnimC", "Joint6AnimC",
+    ];
     static JOINT_RANGE_FIELD = [
         "    rate-low-high", "    rate-low-high2", "    rate-low-high3",
         "    rate-low-high4", "    rate-low-high5", "    rate-low-high6",
