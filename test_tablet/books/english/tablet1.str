@@ -1,12 +1,15 @@
-page_0_decal_0: "0 100 0 tabletp\\tabletp0"
-page_0_decal_1: "1 140 0 tabletp\\tabletp1"
-page_0: "Star gazer's journal, 67th evening of observation
+page_0_decal_0: "0 100 0 tabletp\\parchment"
+page_0_decal_1: "1 140 0 tabletp\\tablet"
+page_0_decal_2: "1 200 70 tabletp\\tablet1"
+page_0: "This particular tablet is strange. The one figure is repeated innumerable times, a circle with three dots. Evidently this ideogram - or what it represents - was very important to the inscriber.
 
-I can stand it no longer.  Since my first examinations of that distant globe, that glorious blue jewel, I knew my time here in the city was at an end.  For how could I possibly remain content in this quagmire of filth, corruption, and religious fanaticism when there exists a whole new world just within reach, ripe for exploration?"
+Also it is vital that this text is exactly duplicated on both pages!"
 
 
-page_1_decal_0: "0 13 0 tabletp\\tabletp1"
-page_1_decal_1: "0 100 0 tabletp\\tabletp0"
-page_1: "Star gazer's journal, 67th evening of observation
 
-I can stand it no longer.  Since my first examinations of that distant globe, that glorious blue jewel, I knew my time here in the city was at an end.  For how could I possibly remain content in this quagmire of filth, corruption, and religious fanaticism when there exists a whole new world just within reach, ripe for exploration?"
+page_1_decal_0: "0 13 0 tabletp\\tablet"
+page_1_decal_1: "0 73 70 tabletp\\tablet1"
+page_1_decal_2: "0 100 0 tabletp\\parchment"
+page_1: "This particular tablet is strange. The one figure is repeated innumerable times, a circle with three dots. Evidently this ideogram - or what it represents - was very important to the inscriber.
+
+Also it is vital that this text is exactly duplicated on both pages!"
