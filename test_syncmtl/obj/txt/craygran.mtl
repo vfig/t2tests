@@ -1,0 +1,6 @@
+render_pass {
+    texture tex/grad.png
+    shaded 0
+    alpha 0.5
+    uv_source texture
+}

@@ -1,0 +1,8 @@
+render_pass {
+    texture tex/grad.png
+    shaded 0
+    alpha 0.5
+    uv_source texture
+    //uv_mod uoffset_wave sawtooth 0.0 1.0 0.0 2000
+    uv_mod scroll 0.0 -0.5
+}
