@@ -31,13 +31,12 @@ class SineMovement extends SqRootScript
         local ref_pos = base_pos + vector(0,mag*sin(freq*time),0);
         local pos = Object.Position(self);
         local fac = Object.Facing(self);
-        local vel = (ref_pos-pos); //*0.01667;
-        SetProperty("PhysControl", "Velocity", vel*60.0);
-        print("error: " + (ref_pos-pos).Length());
-        //print("vel: " + vel);
-        //SetProperty("ConveyorVel", vel);
-
-        // FIXME: use ConveyorVelocity? or just set physics values directly?
-        //Object.Teleport(self, pos, fac);
+        local dist = (ref_pos-pos);
+        local error = dist.Length();
+        SetProperty("PhysControl", "Velocity", dist*60.0);
+        if (error>=0.25) {
+            print("error is " + error + ", teleporting!");
+            Object.Teleport(self, ref_pos, fac);
+        }
     }
 }
