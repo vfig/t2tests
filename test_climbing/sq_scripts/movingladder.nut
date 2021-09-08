@@ -21,6 +21,8 @@ class SineMovement extends SqRootScript
         if (message().starting) {
             SetProperty("PhysControl", "Controls Active", 2); /* Velocity */
             SetProperty("PhysControl", "Velocity", vector());
+            SetProperty("PhysAttr", "Gravity %", 0.0);
+            SetData("BasePos", Object.Position(self));
         }
     }
 
@@ -48,7 +50,7 @@ class SineMovement extends SqRootScript
     }
 
     function UpdatePosition(time) {
-        local base_pos = vector(6.0,0.0,-2.0);
+        local base_pos = GetData("BasePos");
         const mag = 6.0;
         const freq = 0.5; // per second
         local ref_pos = base_pos + vector(0,mag*sin(freq*time),0);
