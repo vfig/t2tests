@@ -110,3 +110,12 @@ class SineMovementRope extends SqRootScript
         SetProperty("PhysState", "Velocity", vel);
     }
 }
+
+class GrowRope extends SqRootScript {
+    function OnTurnOn() {
+        // for some reason this doesnt work after five
+        // to ten seconds after the mission starts. maybe the
+        // rope is going to sleep or something?
+        SetProperty("PhysRope", "Length", -15.0);
+    }
+}
