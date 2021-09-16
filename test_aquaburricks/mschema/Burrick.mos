@@ -266,3 +266,9 @@ XYZScale  0
 motion BK111001     4  500
 motion BK111002     4  500
 motion BK111000     4  500
+
+schema Stand 0, Doof 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion burrheadbang     4  500
