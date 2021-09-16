@@ -347,7 +347,11 @@ def read_mi(mi):
     """
     cret,numframes,fps = unpack('<4xlfl4x', mi.read(20))
     numframes = int(numframes)
-    motname = mi.read(12).decode('ascii')
+    # Trim null and trailing garbage (if any)
+    raw_name = mi.read(12)
+    if 0 in raw_name:
+      raw_name = raw_name[:raw_name.index(0)]
+    motname = raw_name.decode('ascii')
     if motname.find('\0') != -1:
         motname = motname[:motname.find('\0')]
     mi.seek(64, 1)
@@ -427,7 +431,7 @@ def write_bvh(bvh, torsos, joints, jointmap):
             bvh.write(tab+"CHANNELS 3 Xrotation Yrotation Zrotation\n")
             for j in joint['JOINTS']:
                 bvh_joint(j, tab)
-        
+
 
     def bvh_joint(jnum, tab):
         joint = joints[jnum]
