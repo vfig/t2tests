@@ -22,6 +22,13 @@ XYZScale  0
 motion BK111012     0  150
 motion BK111011     0  150
 
+schema Locomote 0, Swimming 0
+MType  GroundLocoPair
+TimeScale 0
+XYZScale  0
+motion BK111012s    0  150
+motion BK111011s    0  150
+
 schema Stand 0, Wheel 0
 MType  StandWith90s
 TimeScale 0
