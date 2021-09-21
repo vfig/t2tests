@@ -25,10 +25,16 @@ class AquaBurrick extends SqRootScript
 
 class BurrickPuppetteer extends SqRootScript
 {
+    function OnSim() {
+        if (message().starting) {
+            PostMessage(self, "TurnOn");
+        }
+    }
+
     function OnTurnOn() {
-        // Pull the motion name from the sender's "AI: Motion Tags"
-        // property. It's abusing the property, but since a button
-        // isn't an AI, it doesn't matter.
+        // Pull the motion name from the "AI: Motion Tags"
+        // property. It's abusing the property, but since the
+        // pupetteer isn't an AI, it doesn't matter.
         local sender = message().from;
         local motion = Property.Get(sender, "AI_MotTags");
         SetData("CurrentMotion", motion);
@@ -38,7 +44,7 @@ class BurrickPuppetteer extends SqRootScript
     function OnTurnOff() {
         local start_time = GetData("MotionStart").tofloat();
         local duration = (GetTime() - start_time);
-        print("Duration: " + duration);
+        //print("Duration: " + duration);
         // Loop the motion if its more than a couple frames
         if (duration > 0.035) {
             PlayMotion(GetData("CurrentMotion"));
@@ -55,9 +61,9 @@ class BurrickPuppetteer extends SqRootScript
             local motion = GetData("CurrentMotion");
 
             // Display which motion we're playing
-            local message = motion;
-            print(message);
-            DarkUI.TextMessage(message, 0xFFFFFF, 30000);
+            //local message = motion;
+            //print("CurrentMotion: "+message);
+            //DarkUI.TextMessage(message, 0xFFFFFF, 30000);
 
             SetData("MotionStart", GetTime());
 
@@ -85,6 +91,45 @@ class BurrickPuppet extends SqRootScript
             if (puppeteer != 0) {
                 PostMessage(puppeteer, "TurnOff");
             }
+        }
+    }
+}
+
+class BurrickConversation extends SqRootScript
+{
+    function OnSim() {
+        if (message().starting) {
+            // Pull the motion name from the "AI: Motion Tags"
+            // property. It's abusing the property, but since the
+            // pupetteer isn't an AI, it doesn't matter.
+            //
+            // Property.Set() for conversation fields doesn't work
+            // for anything other than the first set of field (because
+            // the field names are identical). But in this case it is
+            // the first set of fields we want to change.
+            local tags = GetProperty("AI_MotTags");
+            if (tags!=null && tags!="") {
+                Property.Set(self, "AI_Converation", "   Argument 3", tags);
+            }
+            PostMessage(self, "TurnOn");
+        }
+    }
+
+    function OnTurnOn() {
+        AI.StartConversation(self);
+    }
+}
+
+class BurrickActor extends SqRootScript
+{
+    function OnConversationDone() {
+        local link = Link.GetOne("~AIConversationActor", self);
+        if (link) {
+            local conv = LinkDest(link);
+            // Our motion may have moved or turned us, so we want
+            // to reset our position again.
+            Object.Teleport(self, vector(), vector(), conv);
+            PostMessage(conv, "TurnOn");
         }
     }
 }
