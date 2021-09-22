@@ -15,6 +15,14 @@ motion BK111ooo     4  500
 motion BK111214     6  500
 motion BK111215     6  500
 
+schema Stand 0, Swimming 0
+MType  StandWith90s
+TimeScale 0.7
+XYZScale  0
+motion bkswimidle   4  500
+motion BK111214     6  500
+motion BK111215     6  500
+
 schema Locomote 0
 MType  GroundLocoPair
 TimeScale 0
