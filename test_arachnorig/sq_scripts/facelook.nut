@@ -2,7 +2,7 @@ class FacePuppetteer extends SqRootScript
 {
     function OnSim() {
         if (message().starting) {
-            //PostMessage(self, "TurnOn");
+            PostMessage(self, "TurnOn");
         }
     }
 
@@ -17,9 +17,9 @@ class FacePuppetteer extends SqRootScript
         local duration = (GetTime() - start_time);
         print("Duration: " + duration);
         // Loop the motion if its more than a couple frames
-//        if (duration > 0.035) {
-//            PlayMotion(GetData("CurrentMotion"));
-//        }
+        if (duration > 0.035) {
+            PlayMotion(GetData("CurrentMotion"));
+        }
     }
 
     function PlayMotion(index) {
@@ -40,6 +40,9 @@ class FacePuppetteer extends SqRootScript
 
             // Animate the puppet
             local result = Puppet.PlayMotion(puppet, motion);
+
+            // havent changed sound schemas, so just overrode this .wav
+            Sound.PlaySchemaAmbient(0, "bas0101b");
         } else {
             print("No puppet!");
         }
