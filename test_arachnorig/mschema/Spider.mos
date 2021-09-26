@@ -189,3 +189,9 @@ MType  GroundAction
 TimeScale 0
 XYZScale  0
 motion fetalspi     0  500
+
+schema Salute 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion facelook     0  500
