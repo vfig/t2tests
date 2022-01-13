@@ -39,6 +39,13 @@ class cGUIOverlay extends IDarkOverlayHandler {
         const maxScreenDistance = 7.0;
         local activeScreen = 0;
         local activeScreenDistance = 999999.0;
+
+        // For determining gizmo coordinates:
+        local activeScreenPos = vector();
+        local activeScreenRight = vector();
+        local activeScreenUp = vector();
+        local activeScreenScale = vector();
+
         local cursorX = -1.0, cursorY = -1.0;
         local cursorWorldSpace = vector();
 
@@ -76,7 +83,7 @@ class cGUIOverlay extends IDarkOverlayHandler {
             ref = bitmapWorldSpace? vector(1.0,0.0,0.0) : vector(0.0,1.0,0.0);
             local screenRight = Object.ObjectToWorld(screen, ref)-screenPos;
             screenRight.Normalize();
-            local scale = vector(1.0,1.0,1.0);;
+            local scale = vector(1.0,1.0,1.0);
             if (bitmapWorldSpace) {
                 scale.y = Property.Get(screen, "BitmapWorld", "x size (feet)");
                 scale.z = Property.Get(screen, "BitmapWorld", "y size (feet)");
@@ -93,6 +100,10 @@ class cGUIOverlay extends IDarkOverlayHandler {
 
             if (cursorOnScreen && hitDistance<activeScreenDistance) {
                 activeScreen = screen;
+                activeScreenPos = screenPos;
+                activeScreenRight = screenRight;
+                activeScreenUp = screenUp;
+                activeScreenScale = scale;
                 cursorX = x;
                 cursorY = y;
                 cursorWorldSpace.x = hitPosWorldSpace.x;
@@ -147,17 +158,68 @@ class cGUIOverlay extends IDarkOverlayHandler {
             local activeGizmo = 0;
             foreach (link in Link.GetAll("Owns", screen)) {
                 slink.LinkGet(link);
-                // todo: get screen-space position and bounds of the gizmo!
                 local gizmo = slink.dest;
-                local w = 0.92/8.0;
-                local h = 1.07/4.5;
-                local x0 = 0.5-0.5*w;
-                local y0 = 0.5-0.5*h;
-                local x1 = 0.5+0.5*w;
-                local y1 = 0.5+0.5*h;
+
+                // Measure the size of the gizmo, with a physics gimmick.
+                // In the business, we call this a gizzfizzmick!
+                local hasPhysics = Property.Possessed(gizmo, "PhysType");
+                if (hasPhysics && Property.Get(gizmo, "PhysType", "Type")==3) { // None
+                    print("WARNING: has physics property, with None type.");
+                    hasPhysics = false;
+                }
+                if (!hasPhysics) {
+                    // Add physics, just for a moment!
+                    Property.Set(gizmo, "PhysType", "Type", 0);
+                }
+                local size = vector();
+                local type = Property.Get(gizmo, "PhysType", "Type");
+                if (type==0) { // OBB
+                    local sz = Property.Get(gizmo, "PhysDims", "Size");
+                    size.x = sz.x;
+                    size.y = sz.y;
+                    size.z = sz.z;
+                } else if (type==1||type==2) { // Sphere, Sphere Hat
+                    local rad = Property.Get(gizmo, "PhysDims", "Radius 1");
+                    size.x = 2.0*rad;
+                    size.y = 2.0*rad;
+                    size.z = 2.0*rad;
+                } else { // None
+                    print("WARNING: has physics property, with None type.");
+                }
+                if (!hasPhysics) {
+                    // Remove physics again
+                    Property.Set(gizmo, "PhysType", "Type", 3);
+                }
+
+                // TODO: take gizmo's own scale into account
+                // local scale = vector(1.0,1.0,1.0);
+                // if (bitmapWorldSpace) {
+                //     scale.y = Property.Get(screen, "BitmapWorld", "x size (feet)");
+                //     scale.z = Property.Get(screen, "BitmapWorld", "y size (feet)");
+                // } else {
+                //     if (Property.Possessed(screen, "Scale")) {
+                //         scale = Property.Get(screen, "Scale");
+                //     }
+                // }
+
+                // Get the gizmo position and size in gui space.
+                local gizmoPos = Object.Position(gizmo);
+                local gizmoScreenRelPos = gizmoPos-activeScreenPos;
+                local centerX = gizmoScreenRelPos.Dot(activeScreenRight)/activeScreenScale.y+0.5;
+                local centerY = 1.0-(gizmoScreenRelPos.Dot(activeScreenUp)/activeScreenScale.z+0.5);
+                local corner = Object.ObjectToWorld(gizmo, size*0.5)-gizmoPos;
+                local halfWidth = fabs(corner.Dot(activeScreenRight)/activeScreenScale.y);
+                local halfHeight = fabs(corner.Dot(activeScreenUp)/activeScreenScale.z);
+
+                // Check if the cursor is over this gizmo.
+                local x0 = centerX-halfWidth;
+                local y0 = centerY-halfHeight;
+                local x1 = centerX+halfWidth;
+                local y1 = centerY+halfHeight;
                 local cursorOver = (cursorX>=x0 && cursorX<x1 && cursorY>=y0 && cursorY<y1);
                 if (cursorOver && activeGizmo==0) {
                     activeGizmo = gizmo;
+
                 }
 
                 // Enable frobbing for the active gizmo; disable it for the rest.
