@@ -69,6 +69,7 @@ class cGUIOverlay extends IDarkOverlayHandler {
 
     // IDarkOverlayHandler interface
     function DrawHUD() {
+        const kFrobIgnore = 8;
         local player = Object.Named("Player");
         local cameraPos = Camera.CameraToWorld(vector());
         local cameraLook = Camera.CameraToWorld(vector(1,0,0))-cameraPos;
@@ -164,11 +165,29 @@ class cGUIOverlay extends IDarkOverlayHandler {
         // Brighten the active screen only
         foreach (screen in m_screens) {
             if (screen==activeScreen) {
-                Property.Set(screen, "ExtraLight", "Amount (-1..1)", 0.1);
+                // TEMP: while testing screen-only frob
+                // Property.Set(screen, "ExtraLight", "Amount (-1..1)", 0.1);
+                // Property.Set(screen, "ExtraLight", "Additive?", true);
+                local baseHilight=0.21;
+                local levelHilight=0.47;
+                //local fadeHilight=0.129;
+                Property.Set(screen, "ExtraLight", "Amount (-1..1)", -(baseHilight+levelHilight));
                 Property.Set(screen, "ExtraLight", "Additive?", true);
             } else {
-                Property.Set(screen, "ExtraLight", "Amount (-1..1)", -0.2);
+                //Property.Set(screen, "ExtraLight", "Amount (-1..1)", -0.2);
+                //Property.Set(screen, "ExtraLight", "Additive?", true);
+                Property.Set(screen, "ExtraLight", "Amount (-1..1)", 0.0);
                 Property.Set(screen, "ExtraLight", "Additive?", true);
+            }
+
+            // TEMP: while testing screen-only frob
+            local frob = Property.Get(screen, "FrobInfo", "World Action").tointeger();
+            if (activeScreen==screen && (frob&kFrobIgnore)==kFrobIgnore) {
+                frob = frob&~kFrobIgnore;
+                Property.Set(screen, "FrobInfo", "World Action", frob);
+            } else if (activeScreen!=screen && (frob&kFrobIgnore)==0) {
+                frob = frob|kFrobIgnore;
+                Property.Set(screen, "FrobInfo", "World Action", frob);
             }
         }
 
@@ -188,7 +207,6 @@ class cGUIOverlay extends IDarkOverlayHandler {
 
         // handle gizmos
         local slink = sLink();
-        const kFrobIgnore = 8;
         foreach (screen in m_screens) {
             // disable all gizmos in inactive screens
             if (screen!=activeScreen) {
@@ -240,13 +258,15 @@ class cGUIOverlay extends IDarkOverlayHandler {
                 local cursorOver = (cursorX>=x0 && cursorX<x1 && cursorY>=y0 && cursorY<y1);
                 if (cursorOver && activeGizmo==0) {
                     activeGizmo = gizmo;
-
                 }
 
                 // Enable frobbing for the active gizmo; disable it for the rest.
                 local frob = Property.Get(gizmo, "FrobInfo", "World Action").tointeger();
                 if (activeGizmo==gizmo && (frob&kFrobIgnore)==kFrobIgnore) {
-                    frob = frob&~kFrobIgnore;
+                    // frob = frob&~kFrobIgnore;
+                    // Property.Set(gizmo, "FrobInfo", "World Action", frob);
+                    // TEMP: while testing screen-only frob
+                    frob = frob|kFrobIgnore;
                     Property.Set(gizmo, "FrobInfo", "World Action", frob);
                 } else if (activeGizmo!=gizmo && (frob&kFrobIgnore)==0) {
                     frob = frob|kFrobIgnore;
