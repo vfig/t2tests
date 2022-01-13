@@ -16,6 +16,42 @@ function IntersectRayPlane(rayOrigin, rayDirection, planeOrigin, planeNormal, hi
     return false;
 }
 
+function GetObjectDimensions(obj) {
+    // Measure the size of the gizmo, with a physics gimmick.
+    // In the business, we call this a gizzfizzmick!
+    // This is goddamn stupid, but it does work!
+    local hasPhysics = Property.Possessed(obj, "PhysType");
+    if (hasPhysics && Property.Get(obj, "PhysType", "Type")==3) { // None
+        print("WARNING: has physics property, with None type.");
+        hasPhysics = false;
+    }
+    if (!hasPhysics) {
+        // Add physics, just for a moment!
+        Property.Set(obj, "PhysType", "Type", 0);
+    }
+    local size = vector();
+    local type = Property.Get(obj, "PhysType", "Type");
+    if (type==0) { // OBB
+        local sz = Property.Get(obj, "PhysDims", "Size");
+        size.x = sz.x;
+        size.y = sz.y;
+        size.z = sz.z;
+    } else if (type==1||type==2) { // Sphere, Sphere Hat
+        local rad = Property.Get(obj, "PhysDims", "Radius 1");
+        // Use the diameter.
+        size.x = 2.0*rad;
+        size.y = 2.0*rad;
+        size.z = 2.0*rad;
+    } else { // None
+        print("WARNING: has physics property, with None type.");
+    }
+    if (!hasPhysics) {
+        // Remove physics again
+        Property.Set(obj, "PhysType", "Type", 3);
+    }
+    return size;
+}
+
 class cGUIOverlay extends IDarkOverlayHandler {
     m_screens = null;
 
@@ -69,8 +105,6 @@ class cGUIOverlay extends IDarkOverlayHandler {
             // intersect the camera look with the screen plane
             local hitPosWorldSpace = vector();
             local hit = IntersectRayPlane(cameraPos, cameraLook, screenPos, screenNormal, hitPosWorldSpace);
-            // ghetto cursor, in the plane of the screen
-            // TODO: cursor handling needs to be global!
             if (!hit)
                 continue;
 
@@ -154,60 +188,32 @@ class cGUIOverlay extends IDarkOverlayHandler {
                 continue;
             }
 
+            // TODO: support Bitmap Worldspace gizmos
+
             // look for active gizmos
             local activeGizmo = 0;
             foreach (link in Link.GetAll("Owns", screen)) {
                 slink.LinkGet(link);
                 local gizmo = slink.dest;
 
-                // Measure the size of the gizmo, with a physics gimmick.
-                // In the business, we call this a gizzfizzmick!
-                local hasPhysics = Property.Possessed(gizmo, "PhysType");
-                if (hasPhysics && Property.Get(gizmo, "PhysType", "Type")==3) { // None
-                    print("WARNING: has physics property, with None type.");
-                    hasPhysics = false;
-                }
-                if (!hasPhysics) {
-                    // Add physics, just for a moment!
-                    Property.Set(gizmo, "PhysType", "Type", 0);
-                }
-                local size = vector();
-                local type = Property.Get(gizmo, "PhysType", "Type");
-                if (type==0) { // OBB
-                    local sz = Property.Get(gizmo, "PhysDims", "Size");
-                    size.x = sz.x;
-                    size.y = sz.y;
-                    size.z = sz.z;
-                } else if (type==1||type==2) { // Sphere, Sphere Hat
-                    local rad = Property.Get(gizmo, "PhysDims", "Radius 1");
-                    size.x = 2.0*rad;
-                    size.y = 2.0*rad;
-                    size.z = 2.0*rad;
-                } else { // None
-                    print("WARNING: has physics property, with None type.");
-                }
-                if (!hasPhysics) {
-                    // Remove physics again
-                    Property.Set(gizmo, "PhysType", "Type", 3);
-                }
-
-                // TODO: take gizmo's own scale into account
-                // local scale = vector(1.0,1.0,1.0);
-                // if (bitmapWorldSpace) {
-                //     scale.y = Property.Get(screen, "BitmapWorld", "x size (feet)");
-                //     scale.z = Property.Get(screen, "BitmapWorld", "y size (feet)");
-                // } else {
-                //     if (Property.Possessed(screen, "Scale")) {
-                //         scale = Property.Get(screen, "Scale");
-                //     }
-                // }
-
                 // Get the gizmo position and size in gui space.
+                // TODO: this call is the biggest hit in performance. Consider
+                // caching gizmo dimensions.
+                local gizmoSize = GetObjectDimensions(gizmo);
+                if (Property.Possessed(gizmo, "Scale")) {
+                    // The ObjectToWorld() call applies the scale (when all I
+                    // really want is the orientation). So divide by object
+                    // scale in advance.
+                    local scale = Property.Get(gizmo, "Scale");
+                    gizmoSize.x /= scale.x;
+                    gizmoSize.y /= scale.y;
+                    gizmoSize.z /= scale.z;
+                }
                 local gizmoPos = Object.Position(gizmo);
                 local gizmoScreenRelPos = gizmoPos-activeScreenPos;
                 local centerX = gizmoScreenRelPos.Dot(activeScreenRight)/activeScreenScale.y+0.5;
                 local centerY = 1.0-(gizmoScreenRelPos.Dot(activeScreenUp)/activeScreenScale.z+0.5);
-                local corner = Object.ObjectToWorld(gizmo, size*0.5)-gizmoPos;
+                local corner = Object.ObjectToWorld(gizmo, gizmoSize*0.5)-gizmoPos;
                 local halfWidth = fabs(corner.Dot(activeScreenRight)/activeScreenScale.y);
                 local halfHeight = fabs(corner.Dot(activeScreenUp)/activeScreenScale.z);
 
