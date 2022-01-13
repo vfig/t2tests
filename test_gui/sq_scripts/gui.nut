@@ -102,12 +102,12 @@ class cGUIOverlay extends IDarkOverlayHandler {
         }
 
         // Brighten the active screen only
-        foreach (i, screen in m_screens) {
+        foreach (screen in m_screens) {
             if (screen==activeScreen) {
-                Property.Set(screen, "ExtraLight", "Amount (-1..1)", 1.0);
-                Property.Set(screen, "ExtraLight", "Additive?", false);
+                Property.Set(screen, "ExtraLight", "Amount (-1..1)", 0.1);
+                Property.Set(screen, "ExtraLight", "Additive?", true);
             } else {
-                Property.Set(screen, "ExtraLight", "Amount (-1..1)", 0.0);
+                Property.Set(screen, "ExtraLight", "Amount (-1..1)", -0.2);
                 Property.Set(screen, "ExtraLight", "Additive?", true);
             }
         }
@@ -123,6 +123,52 @@ class cGUIOverlay extends IDarkOverlayHandler {
                 Property.SetSimple(GUICursor.tointeger(), "RenderType", 0);
             } else {
                 Property.SetSimple(GUICursor.tointeger(), "RenderType", 1);
+            }
+        }
+
+        // handle gizmos
+        local slink = sLink();
+        const kFrobIgnore = 8;
+        foreach (screen in m_screens) {
+            // disable all gizmos in inactive screens
+            if (screen!=activeScreen) {
+                foreach (link in Link.GetAll("Owns", screen)) {
+                    slink.LinkGet(link);
+                    local gizmo = slink.dest;
+                    local frob = Property.Get(gizmo, "FrobInfo", "World Action").tointeger();
+                    if ((frob&kFrobIgnore)==0) {
+                        Property.Set(gizmo, "FrobInfo", "World Action", frob|kFrobIgnore);
+                    }
+                }
+                continue;
+            }
+
+            // look for active gizmos
+            local activeGizmo = 0;
+            foreach (link in Link.GetAll("Owns", screen)) {
+                slink.LinkGet(link);
+                // todo: get screen-space position and bounds of the gizmo!
+                local gizmo = slink.dest;
+                local w = 0.92/8.0;
+                local h = 1.07/4.5;
+                local x0 = 0.5-0.5*w;
+                local y0 = 0.5-0.5*h;
+                local x1 = 0.5+0.5*w;
+                local y1 = 0.5+0.5*h;
+                local cursorOver = (cursorX>=x0 && cursorX<x1 && cursorY>=y0 && cursorY<y1);
+                if (cursorOver && activeGizmo==0) {
+                    activeGizmo = gizmo;
+                }
+
+                // Enable frobbing for the active gizmo; disable it for the rest.
+                local frob = Property.Get(gizmo, "FrobInfo", "World Action").tointeger();
+                if (activeGizmo==gizmo && (frob&kFrobIgnore)==kFrobIgnore) {
+                    frob = frob&~kFrobIgnore;
+                    Property.Set(gizmo, "FrobInfo", "World Action", frob);
+                } else if (activeGizmo!=gizmo && (frob&kFrobIgnore)==0) {
+                    frob = frob|kFrobIgnore;
+                    Property.Set(gizmo, "FrobInfo", "World Action", frob);
+                }
             }
         }
     }
