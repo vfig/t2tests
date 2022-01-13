@@ -1,5 +1,5 @@
 
-GUICursor <- null;
+GUICursor <- 0;
 
 function IntersectRayPlane(rayOrigin, rayDirection, planeOrigin, planeNormal, hitLocation) {
     local denom = planeNormal.Dot(rayDirection);
@@ -69,6 +69,7 @@ class cGUIOverlay extends IDarkOverlayHandler {
 
     // IDarkOverlayHandler interface
     function DrawHUD() {
+        local player = Object.Named("Player");
         local cameraPos = Camera.CameraToWorld(vector());
         local cameraLook = Camera.CameraToWorld(vector(1,0,0))-cameraPos;
 
@@ -146,6 +147,20 @@ class cGUIOverlay extends IDarkOverlayHandler {
             }
         }
 
+        // Do a raycast to see if anything else is occluding the active screen.
+        local refRayHitObj = object();
+        local rayHitPos = vector();
+        if (Engine.ObjRaycast(cameraPos, cursorWorldSpace, rayHitPos, refRayHitObj, 0, 0x2, player, GUICursor)) {
+            local rayHitObj = refRayHitObj.tointeger();
+            if (rayHitObj!=0
+            && rayHitObj!=activeScreen
+            && ! Link.AnyExist("Owns", activeScreen, rayHitObj)) {
+                // We hit something that is not this screen, nor belongs to it.
+                // This means the screen is occluded.
+                activeScreen = 0;
+            }
+        }
+
         // Brighten the active screen only
         foreach (screen in m_screens) {
             if (screen==activeScreen) {
@@ -162,12 +177,12 @@ class cGUIOverlay extends IDarkOverlayHandler {
         // when looking **with the keyboard**. And who does that?
 
         // ghetto mouse cursor:
-        if (GUICursor!=null) {
+        if (GUICursor!=0) {
             if (activeScreen!=0) {
-                Property.Set(GUICursor.tointeger(), "Position", "Location", cursorWorldSpace);
-                Property.SetSimple(GUICursor.tointeger(), "RenderType", 0);
+                Property.Set(GUICursor, "Position", "Location", cursorWorldSpace);
+                Property.SetSimple(GUICursor, "RenderType", 0);
             } else {
-                Property.SetSimple(GUICursor.tointeger(), "RenderType", 1);
+                Property.SetSimple(GUICursor, "RenderType", 1);
             }
         }
 
@@ -275,7 +290,7 @@ class GUIController extends SqRootScript
     }
 
     function OnSetCursor() {
-        GUICursor = object(message().data);
+        GUICursor = object(message().data).tointeger();
         print(message().message+": "+GUICursor);
     }
 }
