@@ -101,13 +101,13 @@ schema Locomote 0, LocoUrgent 0, Direction 1, WithSword 0
 MType  GroundAction
 TimeScale 0
 XYZScale  0
-motion BH213265     0  500
+motion BH213265     0  500      // Hop to the left while half-facing target
 
 schema Locomote 0, LocoUrgent 0, Direction 2, WithSword 0
 MType  GroundAction
 TimeScale 0
 XYZScale  0
-motion BH21326a     0  500
+motion BH21326a     0  500      // Hop to the right while half-facing target
 
 schema Locomote 0, Direction 3
 MType  GroundAction
@@ -122,9 +122,9 @@ schema Locomote 0, LocoUrgent 0, Direction 3
 MType  GroundAction
 TimeScale 0
 XYZScale  0
-motion BH213256     0  500
-motion BH213300     0  500
-motion BH213301     0  500
+motion BH213256     0  500      // Hop forward (awkwardly) while side-on to target
+motion BH213300     0  500      // Hop forward (with agility) while side-on to target
+motion BH213301     0  500      // Hop forward (also awkwardly) while side-on to target
 
 schema Locomote 0, Direction 1
 MType  GroundAction
@@ -167,9 +167,9 @@ schema Locomote 0, Direction 4, WithSword 0
 MType  GroundAction
 TimeScale 0
 XYZScale  2.9
-motion BH213250     0  500
-motion BH213251     0  500
-motion BH213263     0  500
+motion BH213250     0  500      // hop backwards
+motion BH213251     0  500      //
+motion BH213263     0  500      //
 
 schema ReceiveWound 0, Direction 7, WithSword 0
 MType  GroundAction
@@ -239,5 +239,5 @@ schema Locomote 0, Direction 4, WithSword 0
 MType  GroundLocoPair
 TimeScale 0
 XYZScale  0
-motion BH211050     0  0
-motion BH211051     0  0
+motion BH211050     0  0        // Step backwards (seems to be facing backwards?)
+motion BH211051     0  0        // Step backwards to half-facing (seems to be facing backwards?)

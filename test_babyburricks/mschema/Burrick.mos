@@ -37,6 +37,12 @@ XYZScale  0
 motion BK111o3o     0  150
 motion BK111o31     0  150
 
+schema Locomote 0, LocoUrgent 0, Direction 1, WithSword 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk213265    0  500
+
 schema Locomote 0, LocoUrgent 0, WithTurns 0
 MType  GLP180Turn
 TimeScale 0.4
