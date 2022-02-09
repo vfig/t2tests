@@ -119,13 +119,3 @@ volume -1
 bk1die_1 bk1die_2 bk1die_3
 schema_voice vburrick 1 comdieloud
 schema_voice vburrick 1 comdiesoft
-
-
-
-
-
-
-
-
-
-

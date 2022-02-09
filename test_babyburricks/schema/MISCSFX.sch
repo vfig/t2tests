@@ -729,6 +729,13 @@ volume -500
 burp5 burp2
 env_tag (Event Launch) (LaunchVel 1 1) (CreatureType Burrick) (ArrowType Burp)
 
+//BABY BURPING ATTACK
+schema bbburp
+archetype OTHER_WEAPON
+volume -50
+bbburp5 bbburp2
+env_tag (Event Launch) (LaunchVel 1 1) (CreatureType Burrick) (ArrowType BabyBurp)
+
 //BLOW DART FIRING
 schema fire_dart
 archetype OTHER_WEAPON

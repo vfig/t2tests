@@ -108,3 +108,55 @@ class BurrickActor extends SqRootScript
         }
     }
 }
+
+class BBFleeFromPlayer extends SqRootScript
+{
+    function OnAlertness() {
+        local from = message().oldLevel;
+        local to = message().level;
+        if (to==3 || (to==2 && from==0)) {
+            // Kick off the emit tweq (launch a stench cloud)
+            if (HasProperty("StTweqEmit")) {
+                SetProperty("StTweqEmit", "AnimS", TWEQ_AS_ONOFF);
+            }
+        }
+    }
+}
+
+class ForceFleeExpiry extends SqRootScript
+{
+    /*
+    A fleeing AI can sometimes get stuck trying to path to a flee point,
+    and the Flee goal doesn't let them give up until they reach it. So this
+    script checks every IDLE_PERIOD seconds to see if the AI is fleeing. If
+    they are, we forcibly expire their AIFleeDest link after EXPIRE_PERIOD
+    seconds. This will stop them fleeing, and return them to regularly
+    scheduled AI behaviour (which of course can include fleeing again if the
+    conditions are present).
+    */
+
+    IDLE_PERIOD = 5.0;
+    EXPIRE_PERIOD = 20.0;
+
+    function OnBeginScript() {
+        SetOneShotTimer("ForceFleeExpiry", IDLE_PERIOD, false);
+    }
+
+    function OnTimer() {
+        if (message().name=="ForceFleeExpiry") {
+            local scheduleExpiry = false;
+            local link = Link.GetOne("AIFleeDest", self);
+            if (link) {
+                local forceLinkExpiry = message().data;
+                if (forceLinkExpiry) {
+                    LinkTools.LinkSetData(link, "Reached", true);
+                    LinkTools.LinkSetData(link, "Expiration", 0);
+                } else {
+                    scheduleExpiry = true;
+                }
+            }
+            SetOneShotTimer("ForceFleeExpiry",
+                (scheduleExpiry? EXPIRE_PERIOD : IDLE_PERIOD), scheduleExpiry);
+        }
+    }
+}
