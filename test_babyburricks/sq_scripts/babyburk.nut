@@ -160,3 +160,17 @@ class ForceFleeExpiry extends SqRootScript
         }
     }
 }
+
+class BBFleeToPatrol extends SqRootScript
+{
+    function OnMotherMoved() {
+        Link.DestroyMany("AIFleeTo", self, 0);
+        local point0 = message().data;
+        local point1 = message().data2;
+        local point2 = message().data3;
+        if (point0) Link.Create("AIFleeTo", self, point0);
+        if (point1) Link.Create("AIFleeTo", self, point1);
+        if (point2) Link.Create("AIFleeTo", self, point2);
+        print("New flee points: "+point0+", "+point1+", "+point2);
+    }
+}
