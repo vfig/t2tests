@@ -272,3 +272,39 @@ XYZScale  0
 motion BK111001     4  500
 motion BK111002     4  500
 motion BK111000     4  500
+
+// Hop to the left
+schema Baby 0, Locomote 0, MeleeCombat 0, Direction 1
+//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 1
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion BH213265     0  500
+
+// Hop to the right
+schema Baby 0, Locomote 0, MeleeCombat 0, Direction 2
+//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 2
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion BH21326a     0  500
+
+// Hop forward
+schema Baby 0, Locomote 0, MeleeCombat 0, Direction 3
+//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 3
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion BH213256     0  500
+motion BH213300     0  500
+motion BH213301     0  500
+
+// Hop backwards
+schema Baby 0, Locomote 0, MeleeCombat 0, Direction 4
+//schema Baby 0, MeleeCombat 0, Locomote 0, Direction 4
+MType  GroundAction
+TimeScale 0
+XYZScale  2.9
+motion BH213250     0  500
+motion BH213251     0  500
+motion BH213263     0  500
