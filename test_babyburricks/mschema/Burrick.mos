@@ -22,6 +22,13 @@ XYZScale  0
 motion BK111012     0  150
 motion BK111011     0  150
 
+// Hop forward (walking)
+schema Locomote 0, Hopping 0
+MType  GroundAction
+TimeScale 0
+XYZScale  0
+motion bbk213256s    0  500
+
 schema Stand 0, Wheel 0
 MType  StandWith90s
 TimeScale 0
@@ -267,32 +274,22 @@ motion BK111001     4  500
 motion BK111002     4  500
 motion BK111000     4  500
 
-// Hop to the left
-schema Baby 0, Locomote 0, MeleeCombat 0, Direction 1
-//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 1
+// Hop to the left (fighting)
+schema Locomote 0, Hopping 0, MeleeCombat 0, Direction 1
 MType  GroundAction
 TimeScale 0
 XYZScale  0
 motion bbk213265     0  500
 
-// Hop to the right
-schema Baby 0, Locomote 0, MeleeCombat 0, Direction 2
-//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 2
+// Hop to the right (fighting)
+schema Locomote 0, Hopping 0, MeleeCombat 0, Direction 2
 MType  GroundAction
 TimeScale 0
 XYZScale  0
 motion bbk21326a     0  500
 
-// Hop forward (for walking)
-schema Locomote 0, Baby 0
-MType  GroundAction
-TimeScale 0
-XYZScale  0
-motion bbk213256     0  500
-
-// Hop forward (for fighting)
-schema Baby 0, Locomote 0, MeleeCombat 0, Direction 3
-//schema Baby 0, MeleeCombat 0, Locomote 0, LocoUrgent 0, Direction 3
+// Hop forward (fighting)
+schema Hopping 0, Locomote 0, MeleeCombat 0, Direction 3
 MType  GroundAction
 TimeScale 0
 XYZScale  0
@@ -300,9 +297,8 @@ motion bbk213256     0  500
 //motion BH213300     0  500
 //motion BH213301     0  500
 
-// Hop backwards
-schema Baby 0, Locomote 0, MeleeCombat 0, Direction 4
-//schema Baby 0, MeleeCombat 0, Locomote 0, Direction 4
+// Hop backwards (fighting)
+schema Hopping 0, Locomote 0, MeleeCombat 0, Direction 4
 MType  GroundAction
 TimeScale 0
 XYZScale  2.9

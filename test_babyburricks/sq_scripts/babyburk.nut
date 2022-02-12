@@ -174,3 +174,64 @@ class BBFleeToPatrol extends SqRootScript
         print("New flee points: "+point0+", "+point1+", "+point2);
     }
 }
+
+class BBHopping extends SqRootScript
+{
+    function OnSim() {
+        if (message().starting) {
+            SetData("BBHoppingTimer", 0);
+            HopLater();
+        }
+    }
+
+    function OnAlertness() {
+        if (message().level > message().oldLevel
+        && message().level >= 2) {
+            // stop hopping right now
+            Object.RemoveMetaProperty(self, "M-HoppingBriefly");
+        }
+    }
+
+    function OnAIModeChange() {
+        // when dead, stop trying to hop.
+        if (message().mode == eAIMode.kAIM_Dead) {
+            Object.RemoveMetaProperty(self, "M-Hopping");
+        }
+    }
+
+    function OnTimer() {
+        print(GetTime()+"|"+self+": "+message().name);
+        if (message().name=="BBHopping") {
+            local isHopping = Object.HasMetaProperty(self, "M-HoppingBriefly");
+            if (! isHopping) {
+                // only allowed to hop when carefree
+                local alert = AI.GetAlertLevel(self);
+                if (alert<=1) {
+                    // start hopping
+                    Object.AddMetaProperty(self, "M-HoppingBriefly");
+                }
+            } else {
+                // stop hopping
+                Object.RemoveMetaProperty(self, "M-HoppingBriefly");
+            }
+            HopLater();
+        }
+    }
+
+    function HopLater() {
+        local rand = Data.RandFlt0to1();
+        local isHopping = Object.HasMetaProperty(self, "M-HoppingBriefly");
+        local period;
+        if (isHopping) {
+            // hopping is energy intensive, stop after a short time
+            period = 2.0 + rand*3.0;
+        } else {
+            // but hopping is fun, so start again soon!
+            period = 3.0 + rand*7.0;
+        }
+        local timer = GetData("BBHoppingTimer");
+        if (timer != 0) KillTimer(timer);
+        timer = SetOneShotTimer("BBHopping", period);
+        SetData("BBHoppingTimer", timer);
+    }
+}
