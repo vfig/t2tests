@@ -12,4 +12,4 @@ exit /B 1
 set OUTPUT="%~dpn1.mi"
 
 :run
-python bvh2mi.py %1 ..\mesh\burrick.map 7FFFF %OUTPUT%
+python bvh2mi.py %1 burrick.map 7FFFF %OUTPUT%
