@@ -266,6 +266,12 @@ TimeScale 0
 XYZScale  0
 motion Burrsway     4  500
 
+schema Stand 0, Foo 0
+MType  GroundAction
+TimeScale 2.5
+XYZScale  0
+motion bbkroll      0  500
+
 schema IdleGesture 0
 MType  GroundAction
 TimeScale 0
