@@ -109,13 +109,19 @@ class BurrickActor extends SqRootScript
     }
 }
 
-class BBFleeFromPlayer extends SqRootScript
+class BBBurpWhenSurprised extends SqRootScript
 {
     function OnAlertness() {
+        local hitpoints = GetProperty("HitPoints");
         local from = message().oldLevel;
         local to = message().level;
         if (to==3 || (to==2 && from==0)) {
-            // Kick off the emit tweq (launch a stench cloud)
+            // Don't want to burp if we've just been killed.
+            if (hitpoints <= 0) return;
+            // Burp to launch a defensive stench cloud.
+            //
+            // This will still fire if we were blackjacked from behind though,
+            // and that's fine: it'll teach you not to mistreat baby burricks!
             if (HasProperty("StTweqEmit")) {
                 SetProperty("StTweqEmit", "AnimS", TWEQ_AS_ONOFF);
             }
@@ -171,7 +177,6 @@ class BBFleeToPatrol extends SqRootScript
         if (point0) Link.Create("AIFleeTo", self, point0);
         if (point1) Link.Create("AIFleeTo", self, point1);
         if (point2) Link.Create("AIFleeTo", self, point2);
-        print("New flee points: "+point0+", "+point1+", "+point2);
     }
 }
 
@@ -200,7 +205,6 @@ class BBHopping extends SqRootScript
     }
 
     function OnTimer() {
-        print(GetTime()+"|"+self+": "+message().name);
         if (message().name=="BBHopping") {
             local isHopping = Object.HasMetaProperty(self, "M-HoppingBriefly");
             if (! isHopping) {

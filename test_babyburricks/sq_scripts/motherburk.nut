@@ -12,11 +12,9 @@ class PatrollingMother extends SqRootScript
             link = Link.GetOne("AIPatrol", point1);
             if (link) point2 = LinkDest(link);
         }
-        print("Patrol points: "+point0+", "+point1+", "+point2);
         // Notify each of our children about all three points.
         local links = Link.GetAll("Owns", self);
         foreach (link in links) {
-            print("Notifying "+LinkDest(link));
             SendMessage(LinkDest(link), "MotherMoved", point0, point1, point2);
         }
     }
