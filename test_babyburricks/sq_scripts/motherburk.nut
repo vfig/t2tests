@@ -1,3 +1,43 @@
+class MotherBurrick extends SqRootScript
+{
+    function OnSim() {
+        if (message().starting) {
+            MakeBabiesFollow();
+        }
+    }
+
+    function MakeBabiesFollow() {
+        local links;
+        // Find all the attached watchpoints
+        links = Link.GetAll("~DetailAttachement", self);
+        local watchPoints = [];
+        foreach (link in links) {
+            local o = LinkDest(link);
+            if (Property.Possessed(o, "AI_WtchPnt")) {
+                print("Found watch point "+o);
+                watchPoints.append(o);
+            }
+        }
+        // Find all our babies
+        links = Link.GetAll("Owns", self);
+        local babies = [];
+        foreach (link in links) {
+            local o = LinkDest(link);
+            if (Object.InheritsFrom(o, "BabyBurrick")) {
+                print("Found baby "+o);
+                babies.append(o);
+            }
+        }
+        // Link each baby to each watchpoint
+        foreach (baby in babies) {
+            foreach (pt in watchPoints) {
+                print("Linking "+baby+" to "+pt);
+                Link.Create("AIWatchObj", baby, pt);
+            }
+        }
+    }
+}
+
 class PatrollingMother extends SqRootScript
 {
     function OnPatrolPoint() {

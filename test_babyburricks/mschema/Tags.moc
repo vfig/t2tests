@@ -3,6 +3,13 @@
 //  tag, pick numbers which are similar to similar tags, or just experiment.
 //  Good luck. If you figure out what they are used for, email Shadowspawn.
 
+// A mandatory tag means queries for it will only return schemas that include
+// that tag.
+// Tags that match have their weights added; when multiple schemas are found
+// for a query, the schema with the highest sum of weights will be chosen.
+//
+//     motionTag <Tag> <mandatory> <weight>
+
 motionTag  Test                 1  0
 motionTag  PlaySpecMotion       1  0
 motionTag  Locomote             1  0
@@ -144,3 +151,4 @@ motionTag  Bound                1  0
 motionTag  Archaeologist        0  0.5
 motionTag  Swimming             0  3
 motionTag  Hopping              0  1
+motionTag  Baby                 0  5
