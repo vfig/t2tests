@@ -1,26 +1,96 @@
+/* AutoGravShaft: a vertical shaft which the player can fly up and
+** down in simply by looking up or down.
+**
+** 1. Create a Room Archetype, called e.g. "AutoGravshaft". Give it
+**    the `AutoGravShaft` script.
+** 2. If you want particles in the gravshaft, create a particle object,
+**    and add a ScriptParams link from the room archetype to the particle
+**    object, with the data set to "Particles". The particle object should
+**    have the `StdParticleGroup` script.
+** 3. If you want the grav shaft to be turned off initially, add
+**    `AutoGravShaftOn=0;` to Editor>Design Note.
+**
+** The gravshaft will turn on and off in response to TurnOn and TurnOff
+** messages send to the room archetype.
+**
+** Note: due to the way room objects work, you will need a new Room
+** Archetype, set up as above, for each individual gravshaft.
+*/
 class AutoGravshaft extends SqRootScript {
-    timer = 0;
     previousPitch = 999;
-    particles = 0;
 
     function OnSim() {
         if (message().starting) {
-            // Find the linked particles.
-            local links = Link.GetAll("ScriptParams", self);
-            foreach (link in links) {
-                local link_data = LinkTools.LinkGetData(link, "");
-                if (link_data == "Particles") {
-                    particles = LinkDest(link);
-                }
+            local startEnabled;
+            if ("AutoGravShaftOn" in userparams()) {
+                local onParam = userparams().AutoGravShaftOn.tointeger();
+                print("::'"+onParam+"'");
+                startEnabled = (onParam==1);
+            } else {
+                startEnabled = true;
             }
-            // Start them off in drifting mode.
-            AdjustParticles(0);
+            SetEnabled(startEnabled, true);
         }
     }
 
     function OnPlayerRoomEnter() {
-        local player = message().MoveObjId;
+        SetPlayerInRoom(true);
+    }
+
+    function OnPlayerRoomExit() {
+        SetPlayerInRoom(false);
+    }
+
+    function OnTurnOn() {
+        SetEnabled(true);
+    }
+
+    function OnTurnOff() {
+        SetEnabled(false);
+    }
+
+    function IsPlayerInRoom() {
+        return (GetData("PlayerInRoom")==1);
+    }
+
+    function SetPlayerInRoom(inRoom) {
+        if (inRoom==IsPlayerInRoom()) return;
+        SetData("PlayerInRoom", (inRoom ? 1 : 0));
+        if (inRoom) {
+            if (IsEnabled())
+                StartFiddlingWithGravity();
+        } else {
+            AdjustParticles(0);
+            if (IsEnabled())
+                StopFiddlingWithGravity();
+        }
+    }
+
+    function IsEnabled() {
+        return (GetData("Enabled")==1);
+    }
+
+    function SetEnabled(enabled, initial=false) {
+        if (!initial) {
+            if (enabled==IsEnabled()) return;
+        }
+        SetData("Enabled", (enabled ? 1 : 0));
+        if (enabled) {
+            SendMessage(GetParticles(), "TurnOn");
+            AdjustParticles(0);
+            if (IsPlayerInRoom())
+                StartFiddlingWithGravity();
+        } else {
+            SendMessage(GetParticles(), "TurnOff");
+            if (IsPlayerInRoom())
+                StopFiddlingWithGravity();
+        }
+    }
+
+    function StartFiddlingWithGravity() {
+        local player = Object.Named("Player");
         local vel = vector();
+        previousPitch = 999;
 
         // Make sure the player has air control when at zero gravity.
         Property.Set(player, "PhysAttr", "Base Friction", 1.0);
@@ -35,7 +105,19 @@ class AutoGravshaft extends SqRootScript {
             vel.z += 30.0;
             Physics.SetVelocity(player, vel);
         }
-        timer = SetOneShotTimer("ReadjustGravity", 0.25, player);
+        local timer = SetOneShotTimer("ReadjustGravity", 0.25, player);
+        SetData("GravityTimer", timer);
+    }
+
+    function StopFiddlingWithGravity() {
+        local player = Object.Named("Player");
+        local timer = GetData("GravityTimer");
+        ClearData("GravityTimer");
+        if (timer!=0) {
+            KillTimer(timer);
+        }
+        Property.Set(player, "PhysAttr", "Gravity %", 100.0);
+        Property.Set(player, "PhysAttr", "Base Friction", 0.0);
     }
 
     function AdjustPlayerGravity(player) {
@@ -66,7 +148,26 @@ class AutoGravshaft extends SqRootScript {
         previousPitch = pitch;
     }
 
+    function GetParticles() {
+        if (IsDataSet("ParticlesObj")) {
+            return GetData("ParticlesObj").tointeger();
+        } else {
+            // Find the linked particles.
+            local particles = 0;
+            local links = Link.GetAll("ScriptParams", self);
+            foreach (link in links) {
+                local link_data = LinkTools.LinkGetData(link, "");
+                if (link_data == "Particles") {
+                    particles = LinkDest(link).tointeger();
+                    SetData("ParticlesObj", particles);
+                }
+            }
+            return particles;
+        }
+    }
+
     function AdjustParticles(pitch) {
+        local particles = GetParticles();
         if (particles == 0) return;
         local velMin = vector();
         local velMax = vector();
@@ -103,19 +204,8 @@ class AutoGravshaft extends SqRootScript {
         if (message().name == "ReadjustGravity") {
             local player = message().data;
             AdjustPlayerGravity(player);
-            timer = SetOneShotTimer("ReadjustGravity", 0.25, player);
+            local timer = SetOneShotTimer("ReadjustGravity", 0.25, player);
+            SetData("GravityTimer", timer);
         }
-    }
-
-    function OnPlayerRoomExit() {
-        if (timer) {
-            KillTimer(timer);
-            timer = 0;
-        }
-        previousPitch = 999;
-        AdjustParticles(0);
-        local player = message().MoveObjId;
-        Property.Set(player, "PhysAttr", "Gravity %", 100.0);
-        Property.Set(player, "PhysAttr", "Base Friction", 0.0);
     }
 }
