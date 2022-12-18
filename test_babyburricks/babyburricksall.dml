@@ -1,0 +1,704 @@
+DML1
+
+// MotherBurrick
+
+CreateArch "Burrick" "MotherBurrick"
++ObjProp "MotherBurrick" "Scripts"
+{
+	"Script 0" "MotherBurrick"
+	"Script 1" "PatrollingMother"
+	"Script 2" ""
+	"Script 3" ""
+	"Don't Inherit" FALSE
+}
+
+// MothersTail
+
+CreateArch "Marker" "MothersTail"
++ObjProp "MothersTail" "AI_WtchPnt"
+{
+    "Watch kind" "Self entry"
+    "Priority" "Normal"
+    "Trigger: Radius" 4
+    "         Height" 10
+    "         Required awareness" "(0) None"
+    "         Line requirement" "None"
+    "         Minimum alertness" "(0) None"
+    "         Maximum alertness" "(3) High"
+    "Exit: Link kill option" "Don't kill"
+    "      Kill like links" FALSE
+    "      No test once triggered" FALSE
+    "      Reuse delay" 0
+    "      Reset delay" 0
+    "Response: Step 1" "Wait(Time(ms),Motion Tags)"
+    "   Argument 1" "500"
+    "   Argument 2" "IdleGesture 0"
+    "   Argument 3" ""
+    "Response: Step 2" "Nothing()"
+    "   Argument 1"[1] ""
+    "   Argument 2"[1] ""
+    "   Argument 3"[1] ""
+    "Response: Step 3" "Nothing()"
+    "   Argument 1"[2] ""
+    "   Argument 2"[2] ""
+    "   Argument 3"[2] ""
+    "Response: Step 4" "Nothing()"
+    "   Argument 1"[3] ""
+    "   Argument 2"[3] ""
+    "   Argument 3"[3] ""
+    "Response: Step 5" "Nothing()"
+    "   Argument 1"[4] ""
+    "   Argument 2"[4] ""
+    "   Argument 3"[4] ""
+    "Response: Step 6" "Nothing()"
+    "   Argument 1"[5] ""
+    "   Argument 2"[5] ""
+    "   Argument 3"[5] ""
+    "Response: Step 7" "Nothing()"
+    "   Argument 1"[6] ""
+    "   Argument 2"[6] ""
+    "   Argument 3"[6] ""
+    "Response: Step 8" "Nothing()"
+    "   Argument 1"[7] ""
+    "   Argument 2"[7] ""
+    "   Argument 3"[7] ""
+    "Response: Step 9" "Nothing()"
+    "   Argument 1"[8] ""
+    "   Argument 2"[8] ""
+    "   Argument 3"[8] ""
+    "Response: Step 10" "Nothing()"
+    "   Argument 1"[9] ""
+    "   Argument 2"[9] ""
+    "   Argument 3"[9] ""
+    "Response: Step 11" "Nothing()"
+    "   Argument 1"[10] ""
+    "   Argument 2"[10] ""
+    "   Argument 3"[10] ""
+    "Response: Step 12" "Nothing()"
+    "   Argument 1"[11] ""
+    "   Argument 2"[11] ""
+    "   Argument 3"[11] ""
+    "Response: Step 13" "Nothing()"
+    "   Argument 1"[12] ""
+    "   Argument 2"[12] ""
+    "   Argument 3"[12] ""
+    "Response: Step 14" "Nothing()"
+    "   Argument 1"[13] ""
+    "   Argument 2"[13] ""
+    "   Argument 3"[13] ""
+    "Response: Step 15" "Nothing()"
+    "   Argument 1"[14] ""
+    "   Argument 2"[14] ""
+    "   Argument 3"[14] ""
+    "Response: Step 16" "Nothing()"
+    "   Argument 1"[15] ""
+    "   Argument 2"[15] ""
+    "   Argument 3"[15] ""
+}
+++Link "MothersTail" "MotherBurrick" "DetailAttachement"
+{
+    "Type" "Object"
+    "vhot/sub #" 0
+    "joint" "N/A"
+    "rel pos" -7.00, 0.00, 0.00
+    "rel rot" 0.00, 0.00, 0.00
+    "decal plane norm" 0
+    "decal plane dist" 0.00
+    "Flags" "[None]"
+}
+
+// MothersTailWalk
+
+CreateArch "Marker" "MothersTailWalk"
++ObjProp "MothersTailWalk" "AI_WtchPnt"
+{
+    "Watch kind" "Self entry"
+    "Priority" "Low"
+    "Trigger: Radius" 16
+    "         Height" 10
+    "         Required awareness" "(0) None"
+    "         Line requirement" "None"
+    "         Minimum alertness" "(0) None"
+    "         Maximum alertness" "(3) High"
+    "Exit: Link kill option" "Don't kill"
+    "      Kill like links" FALSE
+    "      No test once triggered" FALSE
+    "      Reuse delay" 0
+    "      Reset delay" 0
+    "Response: Step 1" "Goto object(Object,Speed,Motion Tags)"
+    "   Argument 1" "@MothersTail"
+    "   Argument 2" "Normal"
+    "   Argument 3" ""
+    "Response: Step 2" "Nothing()"
+    "   Argument 1"[1] ""
+    "   Argument 2"[1] ""
+    "   Argument 3"[1] ""
+    "Response: Step 3" "Nothing()"
+    "   Argument 1"[2] ""
+    "   Argument 2"[2] ""
+    "   Argument 3"[2] ""
+    "Response: Step 4" "Nothing()"
+    "   Argument 1"[3] ""
+    "   Argument 2"[3] ""
+    "   Argument 3"[3] ""
+    "Response: Step 5" "Nothing()"
+    "   Argument 1"[4] ""
+    "   Argument 2"[4] ""
+    "   Argument 3"[4] ""
+    "Response: Step 6" "Nothing()"
+    "   Argument 1"[5] ""
+    "   Argument 2"[5] ""
+    "   Argument 3"[5] ""
+    "Response: Step 7" "Nothing()"
+    "   Argument 1"[6] ""
+    "   Argument 2"[6] ""
+    "   Argument 3"[6] ""
+    "Response: Step 8" "Nothing()"
+    "   Argument 1"[7] ""
+    "   Argument 2"[7] ""
+    "   Argument 3"[7] ""
+    "Response: Step 9" "Nothing()"
+    "   Argument 1"[8] ""
+    "   Argument 2"[8] ""
+    "   Argument 3"[8] ""
+    "Response: Step 10" "Nothing()"
+    "   Argument 1"[9] ""
+    "   Argument 2"[9] ""
+    "   Argument 3"[9] ""
+    "Response: Step 11" "Nothing()"
+    "   Argument 1"[10] ""
+    "   Argument 2"[10] ""
+    "   Argument 3"[10] ""
+    "Response: Step 12" "Nothing()"
+    "   Argument 1"[11] ""
+    "   Argument 2"[11] ""
+    "   Argument 3"[11] ""
+    "Response: Step 13" "Nothing()"
+    "   Argument 1"[12] ""
+    "   Argument 2"[12] ""
+    "   Argument 3"[12] ""
+    "Response: Step 14" "Nothing()"
+    "   Argument 1"[13] ""
+    "   Argument 2"[13] ""
+    "   Argument 3"[13] ""
+    "Response: Step 15" "Nothing()"
+    "   Argument 1"[14] ""
+    "   Argument 2"[14] ""
+    "   Argument 3"[14] ""
+    "Response: Step 16" "Nothing()"
+    "   Argument 1"[15] ""
+    "   Argument 2"[15] ""
+    "   Argument 3"[15] ""
+}
+++Link "MothersTailWalk" "MotherBurrick" "DetailAttachement"
+{
+    "Type" "Object"
+    "vhot/sub #" 0
+    "joint" "N/A"
+    "rel pos" -7.00, 0.00, 0.00
+    "rel rot" 0.00, 0.00, 0.00
+    "decal plane norm" 0
+    "decal plane dist" 0.00
+    "Flags" "[None]"
+}
+
+// MothersTailRun
+
+CreateArch "Marker" "MothersTailRun"
++ObjProp "MothersTailRun" "AI_WtchPnt"
+{
+    "Watch kind" "Self entry"
+    "Priority" "Low"
+    "Trigger: Radius" 9999
+    "         Height" 10
+    "         Required awareness" "(0) None"
+    "         Line requirement" "None"
+    "         Minimum alertness" "(0) None"
+    "         Maximum alertness" "(3) High"
+    "Exit: Link kill option" "Don't kill"
+    "      Kill like links" FALSE
+    "      No test once triggered" FALSE
+    "      Reuse delay" 0
+    "      Reset delay" 0
+    "Response: Step 1" "Goto object(Object,Speed,Motion Tags)"
+    "   Argument 1" "@MothersTail"
+    "   Argument 2" "Fast"
+    "   Argument 3" ""
+    "Response: Step 2" "Nothing()"
+    "   Argument 1"[1] ""
+    "   Argument 2"[1] ""
+    "   Argument 3"[1] ""
+    "Response: Step 3" "Nothing()"
+    "   Argument 1"[2] ""
+    "   Argument 2"[2] ""
+    "   Argument 3"[2] ""
+    "Response: Step 4" "Nothing()"
+    "   Argument 1"[3] ""
+    "   Argument 2"[3] ""
+    "   Argument 3"[3] ""
+    "Response: Step 5" "Nothing()"
+    "   Argument 1"[4] ""
+    "   Argument 2"[4] ""
+    "   Argument 3"[4] ""
+    "Response: Step 6" "Nothing()"
+    "   Argument 1"[5] ""
+    "   Argument 2"[5] ""
+    "   Argument 3"[5] ""
+    "Response: Step 7" "Nothing()"
+    "   Argument 1"[6] ""
+    "   Argument 2"[6] ""
+    "   Argument 3"[6] ""
+    "Response: Step 8" "Nothing()"
+    "   Argument 1"[7] ""
+    "   Argument 2"[7] ""
+    "   Argument 3"[7] ""
+    "Response: Step 9" "Nothing()"
+    "   Argument 1"[8] ""
+    "   Argument 2"[8] ""
+    "   Argument 3"[8] ""
+    "Response: Step 10" "Nothing()"
+    "   Argument 1"[9] ""
+    "   Argument 2"[9] ""
+    "   Argument 3"[9] ""
+    "Response: Step 11" "Nothing()"
+    "   Argument 1"[10] ""
+    "   Argument 2"[10] ""
+    "   Argument 3"[10] ""
+    "Response: Step 12" "Nothing()"
+    "   Argument 1"[11] ""
+    "   Argument 2"[11] ""
+    "   Argument 3"[11] ""
+    "Response: Step 13" "Nothing()"
+    "   Argument 1"[12] ""
+    "   Argument 2"[12] ""
+    "   Argument 3"[12] ""
+    "Response: Step 14" "Nothing()"
+    "   Argument 1"[13] ""
+    "   Argument 2"[13] ""
+    "   Argument 3"[13] ""
+    "Response: Step 15" "Nothing()"
+    "   Argument 1"[14] ""
+    "   Argument 2"[14] ""
+    "   Argument 3"[14] ""
+    "Response: Step 16" "Nothing()"
+    "   Argument 1"[15] ""
+    "   Argument 2"[15] ""
+    "   Argument 3"[15] ""
+}
+++Link "MothersTailRun" "MotherBurrick" "DetailAttachement"
+{
+    "Type" "Object"
+    "vhot/sub #" 0
+    "joint" "N/A"
+    "rel pos" -7.00, 0.00, 0.00
+    "rel rot" 0.00, 0.00, 0.00
+    "decal plane norm" 0
+    "decal plane dist" 0.00
+    "Flags" "[None]"
+}
+
+// BabyBurrick
+
+CreateArch "Animal" "BabyBurrick"
++ObjProp "BabyBurrick" "ModelName"
+{
+    "" "burrick2"
+}
++ObjProp "BabyBurrick" "Position"
+{
+    "Location" 0.00, 0.00, 0.00
+    "Heading" 0
+    "Pitch" 0
+    "Bank" 0
+}
++ObjProp "BabyBurrick" "Scripts"
+{
+    "Script 0" "ReloadTweqEmit"
+    "Script 1" "ForceFleeExpiry"
+    "Script 2" "BBFleeToPatrol"
+    "Script 3" ""
+    "Don't Inherit" FALSE
+}
++ObjProp "BabyBurrick" "HitPoints"
+{
+    "" 10
+}
++ObjProp "BabyBurrick" "MAX_HP"
+{
+    "" 10
+}
++ObjProp "BabyBurrick" "FrobInfo"
+{
+    "World Action" "[None]"
+    "Inv Action" "Move, FocusScript"
+    "Tool Action" "[None]"
+}
++ObjProp "BabyBurrick" "CfgTweqEmit"
+{
+    "Halt" "Stop Tweq"
+    "AnimC" "Sim"
+    "MiscC" "ZeroVel, NoPhysics"
+    "CurveC" "[None]"
+    "Rate" 1
+    "Max frames" 1
+    "Emit what" "BabyBurpEmit"
+    "Velocity" 0.00, 0.00, 0.00
+    "Angle Random" 0.00, 0.00, 0.00
+}
++ObjProp "BabyBurrick" "StTweqEmit"
+{
+    "AnimS" "[None]"
+    "MiscS" "[None]"
+    "Cur Time" 0
+    "Frame #" 0
+}
++ObjProp "BabyBurrick" "MotActorTagList"
+{
+    "tags" "Baby 0"
+}
++ObjProp "BabyBurrick" "TimeWarp"
+{
+    "" 0.50
+}
++ObjProp "BabyBurrick" "AI"
+{
+    "Behavior set" "Burrick"
+}
++ObjProp "BabyBurrick" "AI_SndTags" = "Baby 0"
++ObjProp "BabyBurrick" "AI_AlertCap"
+{
+    "Max level" "(3) High"
+    "Min level" "(0) None"
+    "Min relax after peak" "(0) None"
+}
++ObjProp "BabyBurrick" "AI_VisDesc"
+{
+    "Z Offset" 1.00
+    "Cone 1: Flags" "Active, No alert 0, No alert 1, Night vision"
+    "Cone 1: Angle" 170
+    "Cone 1: Z angle" 170
+    "Cone 1: Range" 5
+    "Cone 1: Acuity" 1500
+    "Cone 2: Flags" "Active, No alert 2, No alert 3, Night vision"
+    "Cone 2: Angle" 50
+    "Cone 2: Z angle" 100
+    "Cone 2: Range" 5
+    "Cone 2: Acuity" 1500
+    "Cone 3: Flags" "Active, No alert 2, No alert 3"
+    "Cone 3: Angle" 170
+    "Cone 3: Z angle" 170
+    "Cone 3: Range" 5
+    "Cone 3: Acuity" 1500
+    "Cone 4: Flags" "Active"
+    "Cone 4: Angle" 60
+    "Cone 4: Z angle" 90
+    "Cone 4: Range" 10
+    "Cone 4: Acuity" 200
+    "Cone 5: Flags" "Active, No alert 0, No alert 1, Omni"
+    "Cone 5: Angle" 320
+    "Cone 5: Z angle" 90
+    "Cone 5: Range" 6
+    "Cone 5: Acuity" 70
+    "Cone 6: Flags" "Active"
+    "Cone 6: Angle" 120
+    "Cone 6: Z angle" 90
+    "Cone 6: Range" 22
+    "Cone 6: Acuity" 120
+    "Cone 7: Flags" "Active"
+    "Cone 7: Angle" 150
+    "Cone 7: Z angle" 70
+    "Cone 7: Range" 35
+    "Cone 7: Acuity" 80
+    "Cone 8: Flags" "Active, Peripheral"
+    "Cone 8: Angle" 230
+    "Cone 8: Z angle" 70
+    "Cone 8: Range" 60
+    "Cone 8: Acuity" 60
+    "Cone 9: Flags" "Active, Peripheral"
+    "Cone 9: Angle" 230
+    "Cone 9: Z angle" 110
+    "Cone 9: Range" 80
+    "Cone 9: Acuity" 40
+    "Cone 10: Flags" "[None]"
+    "Cone 10: Angle" 0
+    "Cone 10: Z angle" 0
+    "Cone 10: Range" 0
+    "Cone 10: Acuity" 0
+}
++ObjProp "BabyBurrick" "AI_AwareCap"
+{
+    "Discharge time 1" 2000
+    "Discharge time 2" 4000
+    "Discharge time 3" 15000
+}
++ObjProp "BabyBurrick" "AI_Vision"
+{
+    "" "Well Below Average"
+}
++ObjProp "BabyBurrick" "AI_InvKnd"
+{
+    "" "Don't investigate"
+}
++ObjProp "BabyBurrick" "AI_NonHst"
+{
+    "" "To player until damaged"
+}
++ObjProp "BabyBurrick" "HTHMotionResp"
+{
+    "" 2.90, 8.00, 1.00
+}
++ObjProp "BabyBurrick" "AI_UsesDoors"
+{
+    "" FALSE
+}
++ObjProp "BabyBurrick" "Creature"
+{
+    "Type" "Burrick"
+}
++ObjProp "BabyBurrick" "CretScale"
+{
+    "" 0.60
+}
++ObjProp "BabyBurrick" "BreathConfig"
+{
+    "Max Air (ms)" 5000
+    "Drown Freq (ms)" 500
+    "Drown Damage" 5
+    "Recover rate" 5.00
+}
++ObjProp "BabyBurrick" "AirSupply"
+{
+    "" 5000
+}
++ObjProp "BabyBurrick" "SpchVoice"
+{
+    "" "vburrick"
+}
++ObjProp "BabyBurrick" "Class Tags"
+{
+    "1: Tags" "CreatureType Burrick"
+}
++ObjProp "BabyBurrick" "MeshTex"
+{
+    "texture in model" "burrick2.png"
+    "replace with" "burrick2b.png"
+    "texture in model"[1] ""
+    "replace with"[1] ""
+    "texture in model"[2] ""
+    "replace with"[2] ""
+    "texture in model"[3] ""
+    "replace with"[3] ""
+    "texture in model"[4] ""
+    "replace with"[4] ""
+    "texture in model"[5] ""
+    "replace with"[5] ""
+    "texture in model"[6] ""
+    "replace with"[6] ""
+    "texture in model"[7] ""
+    "replace with"[7] ""
+    "texture in model"[8] ""
+    "replace with"[8] ""
+    "texture in model"[9] ""
+    "replace with"[9] ""
+    "texture in model"[10] ""
+    "replace with"[10] ""
+    "texture in model"[11] ""
+    "replace with"[11] ""
+}
+++MetaProp "BabyBurrick" "GetsKnockedOutEasily"
+++Receptron "BabyBurrick" "Knockout"
+{
+    Min None
+    Max None
+
+    Effect "stim_script_msg"
+    {
+        "Flags" "[None]"
+    }
+}
+++Receptron "BabyBurrick" "Stench"
+{
+    Min None
+    Max None
+
+    Effect "Abort"
+}
+
+// BabyBurpEmit
+
+CreateArch "TrapTrig" "BabyBurpEmit"
++ObjProp "BabyBurpEmit" "ModelName"
+{
+    "" "waypt"
+}
++ObjProp "BabyBurpEmit" "CfgTweqDelete"
+{
+    "Halt" "Destroy Obj"
+    "AnimC" "Sim"
+    "MiscC" "[None]"
+    "CurveC" "[None]"
+    "Rate" 500
+}
++ObjProp "BabyBurpEmit" "StTweqDelete"
+{
+    "AnimS" "On"
+    "MiscS" "[None]"
+    "Cur Time" 0
+    "Frame #" 0
+}
++ObjProp "BabyBurpEmit" "Class Tags"
+{
+    "1: Tags" "ArrowType BabyBurp"
+}
+
+// BabyBurp
+
+CreateArch "SmokePuff" "BabyBurp"
++ObjProp "BabyBurp" "Position"
+{
+    "Location" 0.00, 0.00, 0.00
+    "Heading" 0
+    "Pitch" 0
+    "Bank" 0
+}
++ObjProp "BabyBurp" "CfgTweqDelete"
+{
+    "Halt" "Slay Obj"
+    "AnimC" "Sim"
+    "MiscC" "[None]"
+    "CurveC" "[None]"
+    "Rate" 5000
+}
++ObjProp "BabyBurp" "StTweqDelete"
+{
+    "AnimS" "On"
+    "MiscS" "[None]"
+    "Cur Time" 0
+    "Frame #" 0
+}
++ObjProp "BabyBurp" "PGLaunchInfo"
+{
+    "Launch Type" "Sphere"
+    "Box Min" 0.00, 0.00, 0.00
+    "Box Max" 0.00, 0.00, 0.00
+    "Min Radius" 0.60
+    "Max Radius" 1.00
+    "Loc unrotated?" FALSE
+    "Velocity Min" -1.50, -1.50, -1.50
+    "Velocity Max" 1.50, 1.50, 1.50
+    "Vel unrotated?" FALSE
+    "Min time" 4.00
+    "Max time" 5.00
+}
++ObjProp "BabyBurp" "ParticleGroup"
+{
+    "Active" TRUE
+    "Particle Render Type" "Single-colored disk"
+    "Particle Animation" "Launched one-shot"
+    "Particle Group Motion" "Fire and forget"
+    "number of particles" 25
+    "size of particle" 0.90
+    "bitmap name" ""
+    "velocity" 0.00, 0.00, 0.00
+    "gravity vector" 0.00, 0.00, -0.10
+    "color (palettized)" 125
+    "2nd color" 58
+    "3rd color" 146
+    "alpha" 100
+    "fixed-group radius" 0.50
+    "spin / pulse group" FALSE
+    "spin speed" 0.00, 0.00, 0.00
+    "pulse magnitude" 0.00
+    "pulse cycle time ms" 0
+    "particle fade time" 4.00
+    "launch period" 0.05
+    "animation offset ms" 0
+    "Group-scale velocity" 0.00
+    "bm-disk flags" "[None]"
+    "bm-disk birth time" 0.00
+    "bm-disk rot (vel, offs, rand)" 0.00, 0.00, 0.00
+    "bm-disk ani frame time" 0.00
+    "bm-disk grow speed" 0.00
+    "bm-disk rgb" 0, 0, 0
+    "bm-disk 2nd rgb" 0, 0, 0
+    "bm-disk 3rd rgb" 0, 0, 0
+    "always simulate (slow)" TRUE
+    "always simulate group" FALSE
+    "particles start launched" FALSE
+    "alpha subpixel particles" FALSE
+    "skip subpixel particles" FALSE
+    "ignore attachment refs" FALSE
+    "force matching unrefs" FALSE
+}
+++StimSource "BabyBurp" "Stench"
+{
+    Intensity 3
+
+    Propagator "Radius"
+    {
+        Life
+        {
+            "Flags" "[None]"
+            "Period" 1000
+            "Max Firings" 3
+            "Intensity Slope" -1.00
+        }
+
+        Shape
+        {
+            "Radius" 8.00
+            "Flags" "[None]"
+            "Dispersion" "Linear"
+        }
+    }
+}
+++Link "BabyBurp" "BabyBurpEmit" "DetailAttachement"
+{
+    "Type" "Object"
+    "vhot/sub #" 0
+    "joint" "N/A"
+    "rel pos" 1.50, 0.00, 0.00
+    "rel rot" 0.00, 0.00, 0.00
+    "decal plane norm" 0
+    "decal plane dist" 0.00
+    "Flags" "No Auto-Delete"
+}
+
+// MetaProperties
+
+CreateArch "AI_Behaviors" "***Burrick Behaviours***"
+
+// M-BBFleeFromPlayer
+
+CreateArch "***Burrick Behaviours***" "M-BBFleeFromPlayer"
++ObjProp "M-BBFleeFromPlayer" "Scripts"
+{
+    "Script 0" "BBBurpWhenSurprised"
+    "Script 1" ""
+    "Script 2" ""
+    "Script 3" ""
+    "Don't Inherit" FALSE
+}
++ObjProp "M-BBFleeFromPlayer" "AI_FleeConds"
+{
+    "Condition" "On moderate alert"
+    "Pct Hitpoints" 95
+    "Not if # of friends >=" 9999
+}
+
+// M-Hopping
+
+CreateArch "***Burrick Behaviours***" "M-Hopping"
++ObjProp "M-Hopping" "Scripts"
+{
+    "Script 0" "BBHopping"
+    "Script 1" ""
+    "Script 2" ""
+    "Script 3" ""
+    "Don't Inherit" FALSE
+}
+
+// M-HoppingBriefly
+
+CreateArch "***Burrick Behaviours***" "M-HoppingBriefly"
++ObjProp "M-HoppingBriefly" "AI_MotTags" = "Hopping 0"
