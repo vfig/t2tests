@@ -29,7 +29,19 @@ class DualCompass extends SqRootScript
 
     function AnimateToPose(poseName) {
         print("AnimateToPose("+poseName+")");
-        // Tweqs do not send TweqCompleted if they don't run at all (such as
+        local blink = (poseName=="blink");
+        local pose = POSES[poseName];
+        if (blink) {
+            pose = [pose[0], pose[1]];
+        }
+        AnimateToEyePosition(pose);
+    }
+
+    function AnimateToEyePosition(pose) {
+        // pose is an array: [topLid, bottomLid, eyeX, eyeY],
+        // or if blinking: [topLid, bottomLid]
+        //
+        // NOTE: Tweqs do not send TweqCompleted if they don't run at all (such as
         // if they're already at the target position), nor when one of the
         // joints has rate 0 (even if other joints should move*). So we take
         // those things into account below; and we use our own PoseCompleted
@@ -39,15 +51,10 @@ class DualCompass extends SqRootScript
         // when blinking only the eyelids got moved and TweqCompleted never
         // got sent :(
 
-        //TODO: remove
-        // print("---- FROM ----");
-        // dump_joints();
-
-        local blink = (poseName=="blink");
+        local blink = (pose.len()==2);
         local max_joint = blink ? 2 : 4;
         // TODO: when first 'waking up', this should be slower.
         local eye_speed = blink ? 800 : 400; // degrees/second
-        local pose = POSES[poseName];
         local rate = [0,0,0,0];
         local lo = [0,0,0,0];
         local hi = [0,0,0,0];
@@ -221,5 +228,79 @@ class DualCompassInventory extends DualCompass
             local keepAnimating = GetData("DualCompassAnimating");
             if (keepAnimating) AnimateToRandomPose();
         }
+    }
+}
+
+class DualCompassInventoryStaring extends DualCompass
+{
+    // Inventory
+
+    function OnSim() {
+        print(message().message);
+        SetData("DualCompassAnimating", false);
+    }
+
+    function OnInvSelect() {
+        print(message().message);
+        SetData("DualCompassAnimating", true);
+        PostMessage(self, "AnimateCompassFrame");
+    }
+
+    function OnInvDeSelect() {
+        print(message().message);
+        SetData("DualCompassAnimating", false);
+        AnimateToPose("reset");
+    }
+
+    function OnAnimateCompassFrame() {
+        local keepAnimating = GetData("DualCompassAnimating");
+        if (! keepAnimating) return;
+
+        local t = (GetTime()*-8.4375*10)%360.0;
+        local t2 = (GetTime()*2000.0)%360.0;
+        local fac = Object.Facing(self);
+        local camfac = Camera.GetFacing();
+
+        if (camfac.y>180.0) camfac.y-=360.0;
+        // This is the compass2 angle calculation from drkinvui.
+        local pitch_factor = 0.25*camfac.y;
+        if (pitch_factor < -5.625)
+           pitch_factor=((pitch_factor+5.625)*5)+(-5.625);
+        else if (pitch_factor < -8.4375)
+           pitch_factor=((pitch_factor+8.4375)*2)+(-19.6875);
+        else if (pitch_factor > 5.625)
+           pitch_factor=((pitch_factor-5.625)*2)+(5.625);
+        local camy = -25.3125 - pitch_factor;
+
+/*
+        // Joint 1: compensate for compass z rotation
+        SetProperty("JointPos", "Joint 1", (fac.z+270.0)%360.0);
+        // Joint 2: compensate for compass y rotation
+        SetProperty("JointPos", "Joint 2", (camy+360.0+20.0)%360.0);
+*/
+
+        // left/right: -27 to 27?
+        // up/down: -24 to 24?
+
+        // OKAY, this approach works (i havent figured out x yet tho),
+        // BUT: there is _definitely_ not enough movement on y axis to
+        // allow the compass eye to look at the player directly, unless
+        // the player is staring *way* down at the ground. this needs
+        // model reworking to fix!
+
+        local eyeX = 0.0; // ((fac.z+270.0)%360.0);
+        local eyeY = ((camy+360.0+20.0+70.0)%360.0);
+        // the eye needs to clamp -- but disable for now, because it
+        // is both insufficient (doesnt account for reduced pitch range
+        // when looking to the sides) and interferes with seeing how
+        // the pitch adjustment is working:
+        // if (eyeY < -27.0) eyeY = -27.0;
+        // if (eyeY > 27.0) eyeY = 27.0;
+        local angles = [-50.00, 50.00, eyeX, eyeY];
+        for (local j=0; j<4; ++j) {
+            SetProperty("JointPos", JOINT_POS_FIELD[j], angles[j]);
+        }
+
+        PostMessage(self, "AnimateCompassFrame");
     }
 }
