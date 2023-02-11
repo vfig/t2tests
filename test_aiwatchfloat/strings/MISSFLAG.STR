@@ -1,0 +1,72 @@
+// Valid mission flags
+//
+// skip         This mission doesn't exist; it should be skipped.
+// no_briefing  Skip the briefing movie
+// no_loadout   Skip the loadout
+// cutscene     Play a cutscene immediately afterward
+// end          End the game when this mission is completed
+// 
+
+miss_1: "no_briefing,no_loadout,end"
+miss_2: ""
+miss_3: "skip"
+miss_4: ""
+miss_5: "no_loadout,cutscene"
+miss_6: ""
+miss_7: ""
+miss_8: ""
+miss_9: ""
+miss_10: "no_loadout"
+miss_11: ""
+miss_12: ""
+miss_13: ""
+miss_14: ""
+miss_15: "no_loadout"
+miss_16: "cutscene,end"
+
+//Bank->Blackmail
+miss_7_next: "9"
+//Blackmail->Courier
+miss_9_next: "8"
+//Courier->Viki's Realm
+miss_8_next: "10"
+//Unwelcome Guest -> Precious Cargo
+miss_11_next: "14"
+//Kidnap->Casing
+miss_15_next: "12"
+//Masks->Endgame
+miss_13_next: "16"
+
+//we will want something like this
+//(see drkmislp.c)
+//please remove this comment when you actually put it in.
+miss_10_endmovie: "cs10" 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                           
+
