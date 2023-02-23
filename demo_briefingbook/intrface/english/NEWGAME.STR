@@ -1,0 +1,8 @@
+difficulty: "Difficulty:"
+skip_training: "Briefing Books" 
+options: "Options"
+cancel: "Cancel" 
+
+diff_0:  "Normal"
+diff_1:  "Hard"
+diff_2:  "Expert"

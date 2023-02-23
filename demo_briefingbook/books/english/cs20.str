@@ -1,0 +1,11 @@
+no_trim: "1"
+
+Page_0: "Congratulations on beating the mission! I know this looks a bit like the debrief screen, but it's actually a book, standing in for the ending cutscene.\n\nWith NewDark, we can show pictures, and even change them based on campaign qvars!"
+
+page_0_decal_0: "#0 $ 1 68 200 475"
+page_0_decal_0_text: "You chose... wisely."
+page_0_decal_1: "#0 0 208 203 decals\\wisely"
+
+page_0_decal_2: "#1 $ 1 68 200 475"
+page_0_decal_2_text: "You chose... poorly."
+page_0_decal_3: "#1 0 208 203 decals\\poorly"
