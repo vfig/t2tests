@@ -9,13 +9,16 @@ target and TurnOn along outgoing ControlDevice links.
 The target must be linked from this object with a ScriptParams
 link, with its value set to "ParticleFlowTgt".
 
+TODO: this is _not_
+
 */
 class ParticleFlow extends SqRootScript {
     particles = null;
     target = 0;
     flowSpeed = 3.0;
-    //flowInterval = 0.16;
-    flowInterval = 0.5;
+    flowInterval = 0.16;
+    //flowInterval = 0.5;
+    flowEndDelay = 1.5;
 
     function OnTurnOn() {
         if (IsDataSet("IsComplete")) return;
@@ -42,6 +45,8 @@ class ParticleFlow extends SqRootScript {
     function OnTimer() {
         if (message().name == "ParticleFlow") {
             Flow();
+        } else if (message().name=="ParticleFlowEnd") {
+            FlowEnd();
         }
     }
 
@@ -129,7 +134,7 @@ class ParticleFlow extends SqRootScript {
         FindTarget();
         FindParticles();
 
-        local killParticles = [];
+        local waitForParticlesCount = particles.len();
         local maxDistance = 0.0;
         foreach (p in particles) {
             local objPos = Object.Position(p.obj);
@@ -144,7 +149,9 @@ class ParticleFlow extends SqRootScript {
         foreach (i, p in particles) {
             local distance = p.delta.Length();
             if (distance<(flowInterval*flowSpeed) || p.marker==0) {
-                killParticles.append(i)
+                Object.Teleport(p.obj, vector(), vector(), p.marker);
+                Physics.SetVelocity(p.obj, vector());
+                waitForParticlesCount -= 1;
             } else {
                 local n = p.delta.GetNormalized();
                 local v = vector();
@@ -153,10 +160,28 @@ class ParticleFlow extends SqRootScript {
                 Physics.SetVelocity(p.obj, nv);
            }
         }
-        killParticles.reverse();
-        foreach (i in killParticles) {
-            local p = particles[i];
-            particles.remove(i);
+
+        if (waitForParticlesCount==0) {
+            SetOneShotTimer("ParticleFlowEnd", flowEndDelay);
+        }
+
+        if (particles==null || particles.len()==0 || waitForParticlesCount==0) {
+            SetData("IsComplete", true);
+            SendMessage(target, "ParticleFlowDone");
+            SendMessage(target, "PhantomBegin");
+            SendMessage(target, "TurnOn");
+            Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
+            return;
+        }
+
+        SetOneShotTimer("ParticleFlow", flowInterval);
+    }
+
+    function FlowEnd() {
+        FindTarget();
+        FindParticles();
+
+        foreach (p in particles) {
             Object.Destroy(p.marker);
             Link.Destroy(Link.GetOne("ScriptParams", self, p.obj));
             Physics.SetVelocity(p.obj, vector());
@@ -170,16 +195,6 @@ class ParticleFlow extends SqRootScript {
             LinkTools.LinkSetData(link, "joint", p.joint);
             SendMessage(p.obj, "TurnOff");
         }
-
-        if (particles==null || particles.len()==0) {
-            SetData("IsComplete", true);
-            SendMessage(target, "ParticleFlowDone");
-            SendMessage(target, "PhantomBegin");
-            SendMessage(target, "TurnOn");
-            Link.BroadcastOnAllLinks(self, "TurnOn", "ControlDevice");
-            return;
-        }
-
-        SetOneShotTimer("ParticleFlow", flowInterval);
+        particles = null;
     }
 }
