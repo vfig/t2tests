@@ -109,6 +109,11 @@ MOTIONS <- {
             "WorldFrob 0, OnFloor 0", // not in T2
             "WorldFrob 0, AtChest 0", // not in T2
         ]},
+        {name="Player", tags=[
+            "Locomote 0, Player 0, Crouching 0",    // Walk forward, crouched
+            "Locomote 0, Player 0, Climbing 0",     // Climb ladder (left and right hands)
+            "Stand 0, Player 0, Crouching 0",       // Drop down from ladder.
+        ]},
     ],
 
     /*
