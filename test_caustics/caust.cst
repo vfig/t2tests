@@ -1,0 +1,19 @@
+<CAUSTICS_GENERATOR>
+<CAUSTICS>
+	<DEPTH value="1.500000"/>
+	<INTENSITY value="0.050000"/>
+	<AMP_FILTER value="30.000000"/>
+	<FREQ_FILTER value="1.500000"/>
+	<TIME_FILTER value="32.000000"/>
+	<NUM_ANIM_FRAMES value="16"/>
+	<CURRENT_ANIM_FRAME value="1"/>
+	<SUBDIVISIONS value="64"/>
+</CAUSTICS>
+<OUTPUT>
+	<SIZE width="128" height="128"/>
+	<SUPERSAMPLING value="4"/>
+	<BGCOLOR r="0" g="0" b="0"/>
+	<PREVIEW value="1"/>
+	<FILENAME text="E:\Temp\caustics\causta"/>
+</OUTPUT>
+</CAUSTICS_GENERATOR>

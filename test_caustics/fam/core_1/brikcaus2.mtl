@@ -1,39 +1,41 @@
-## Three-pass rendering effectively blends the caustics into the lightmap,
-## and then lights the texture with it.
+.ifdef 0
 
-render_material_only 1
+## Single-pass rendering makes simple caustics, but they won't light up
+## dark areas.
 
-render_pass {
-    texture $LIGHTMAP
-    uv_source LIGHTMAP
-    shaded 0
-}
+    render_pass {
+        texture * 0 "tex/fx/causx_"
+        blend DST_COLOR SRC_ALPHA
+        uv_mod SCALE 0.25 0.25
+        ani_rate 125
+    }
 
-render_pass {
-    texture * 0 "tex/fx/causx_"
-    blend SRC_COLOR ONE
-    # DST_COLOR 
-    shaded 0
-    uv_mod SCALE 0.25 0.25
-    ani_rate 125
-}
+.else
 
-render_pass {
-    texture $TEXTURE
-    blend DST_COLOR ZERO
-    shaded 0
-}
+## Three-pass rendering blends the caustics with the lightmap, and then
+## lights the original texture with that. Looks cool, but probably slower.
 
+    render_material_only 1
 
-## This alternative second pass just adds the caustic in. It looks worse, as
-## it means the result is white where the caustics are white. But faster.
-#
-# render_material_only 1
-#
-# render_pass {
-#     texture * 0 "tex/fx/causx_"
-#     blend DST_COLOR ONE
-#     shaded 0
-#     uv_mod SCALE 0.25 0.25
-#     ani_rate 125
-# }
+    render_pass {
+        texture $LIGHTMAP
+        uv_source LIGHTMAP
+        shaded 0
+    }
+
+    render_pass {
+        texture * 0 "tex/fx/causx_"
+        blend SRC_ALPHA ONE
+        # DST_COLOR 
+        shaded 0
+        uv_mod SCALE 0.25 0.25
+        ani_rate 125
+    }
+
+    render_pass {
+        texture $TEXTURE
+        blend DST_COLOR ZERO
+        shaded 0
+    }
+
+.endif
