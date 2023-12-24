@@ -24,46 +24,156 @@ PhysAttach
 
 */
 
-class Mimic extends SqRootScript {
-    function BeginEmbodiment() {
-        // local f = float_ref();
-        // local i = int_ref();
-        // local ok = DarkGame.ConfigGetFloat("fov", f);
-        // print("fov (float): "+f.tofloat()+" ok:"+ok);
-        // local ok = DarkGame.ConfigGetInt("fov", i);
-        // print("fov (int): "+f.tointeger()+" ok:"+ok);
-        // local fov = DarkGame.BindingGetFloat("fov");
-        // print("fov (binding): "+fov);
+class PossessMe extends SqRootScript {
+    function OnFrobWorldEnd() {
+        local frobber = message().Frobber;
+        if (Object.InheritsFrom(frobber, "Avatar")) {
+            SendMessage(frobber, "PossessMe");
+        }
+    }
+}
 
-        local player = Object.Named("Player");
-        local anchor = Object.Named("PlayerAnchor");
-        local inv = Object.Named("PlayerInv");
-        local wasAt = Object.Named("PlayerWasAt");
-        local detachorL = Object.Named("PlayerDetachorLeft");
-        local detachorR = Object.Named("PlayerDetachorRight");
-        // TODO: if inv or wasAt do not exist, spawn them as fnords?
-        //       if spawning anchor, it has specific phys needs.
-        if (Link.AnyExist("PhysAttach", player)) {
-            // If the player is attached, it means we are embodied already.
+Possess <- {
+    function GetAnchor() {
+        return Object.Named("PossessAnchor");
+    }
+
+    function GetWasAt() {
+        return Object.Named("PossessWasAt");
+    }
+
+    function GetInventory() {
+        return Object.Named("PossessInventory");
+    }
+
+    function GetFrobLeft() {
+        return Object.Named("PossessFrobLeft");
+    }
+
+    function GetFrobRight() {
+        return Object.Named("PossessFrobRight");
+    }
+
+    function CreateFnords() {
+        local anchor = Possess.GetAnchor();
+        if (anchor==0) {
+            anchor = Object.BeginCreate("fnord");
+            Object.SetName(anchor, "PossessAnchor");
+            Object.Teleport(anchor, vector(), vector());
+            Property.Set(anchor, "PhysType", "Type", 0); // OBB
+            Property.Set(anchor, "PhysType", "# Submodels", 1);
+            Property.Set(anchor, "PhysDims", "Size", vector());
+            Property.Set(anchor, "PhysControl", "Controls Active", 8|16); // Location|Rotation
+            Property.SetSimple(anchor, "CollisionType", 0); // No collision
+            Property.SetSimple(anchor, "PhysCanMant", false);
+            Property.SetSimple(anchor, "PhysAIColl", false);
+            Object.EndCreate(anchor);
+        }
+        local wasAt = Possess.GetWasAt();
+        if (wasAt==0) {
+            wasAt = Object.BeginCreate("fnord");
+            Object.SetName(wasAt, "PossessWasAt");
+            Object.EndCreate(wasAt);
+        }
+        local inv = Possess.GetInventory();
+        if (inv==0) {
+            inv = Object.BeginCreate("fnord");
+            Object.SetName(inv, "PossessInventory");
+            Object.EndCreate(inv);
+        }
+        local frobLeft = Possess.GetFrobLeft();
+        if (frobLeft==0) {
+            frobLeft = Object.BeginCreate("fnord");
+            Object.SetName(frobLeft, "PossessFrobLeft");
+            Property.Set(frobLeft, "FrobInfo", "World Action", 2|16); // Script|FocusScript
+            Property.Set(frobLeft, "FrobInfo", "Inv Action", 2|16); // Script|FocusScript
+            Property.Set(frobLeft, "FrobInfo", "Tool Action", 2|16); // Script|FocusScript
+            Property.SetSimple(frobLeft, "InvType", 2); // Weapon
+            Property.Set(frobLeft, "Scripts", "Script 0", "PossessFrobLeft");
+            // TODO: we don't want to render it like this, except for debug, right?
+            Property.Set(frobLeft, "InvRendType", "Resource", "webgar3");
+            Property.Set(frobLeft, "InvRendType", "Type", "Alternate Bitmap");
+            Object.EndCreate(frobLeft);
+        }
+        local frobRight = Possess.GetFrobRight();
+        if (frobRight==0) {
+            frobRight = Object.BeginCreate("fnord");
+            Object.SetName(frobRight, "PossessFrobRight");
+            Property.Set(frobRight, "FrobInfo", "World Action", 2|16); // Script|FocusScript
+            Property.Set(frobRight, "FrobInfo", "Inv Action", 2|16); // Script|FocusScript
+            Property.Set(frobRight, "FrobInfo", "Tool Action", 0); // [None]
+            Property.SetSimple(frobRight, "InvType", 1); // Item
+            Property.Set(frobRight, "Scripts", "Script 0", "PossessFrobRight");
+            // TODO: we don't want to render it like this, except for debug, right?
+            Property.Set(frobRight, "InvRendType", "Resource", "zombieca");
+            Property.Set(frobRight, "InvRendType", "Type", "Alternate Bitmap");
+            Object.EndCreate(frobRight);
+        }
+    }
+};
+
+class Possessor extends SqRootScript {
+    function OnBeginScript() {
+        if (Object.InheritsFrom(self, "Avatar")) {
+            if (! IsDataSet("IsPossessing")) {
+                SetData("IsPossessing", false);
+            }
+            Possess.CreateFnords();
+        } else {
+            // We are probably the starting point. Do nothing.
+        }
+    }
+
+    function IsPossessing() {
+        return (!! GetData("IsPossessing"));
+    }
+
+    function OnPossessMe() {
+        if (IsPossessing()) {
+            // TODO: support hopping from one possession to another?
+            Reply(false);
+            return;
+        } else {
+            BeginPossession(message().from);
+        }
+    }
+
+    function BeginPossession(target) {
+        if (IsPossessing()) {
+            print("ERROR! Tried to possess when already possessing. Fix this bug!");
             return false;
         }
-        Object.Teleport(wasAt, vector(), vector(), player);
-        Container.MoveAllContents(player, inv, CTF_NONE);
-        Container.Add(detachorL, player, 0, CTF_NONE);
-        Container.Add(detachorR, player, 0, CTF_NONE);
-        local targetFacing = Object.Facing(player);
+        if (Link.AnyExist("PhysAttach", self)) {
+            print("ERROR! Tried to possess when PhysAttached. Fix this bug!");
+            return false;
+        }
+        SetData("IsPossessing", true);
+        local anchor = Possess.GetAnchor();
+        local wasAt = Possess.GetWasAt();
+        local inv = Possess.GetInventory();
+        local frobL = Possess.GetFrobLeft();
+        local frobR = Possess.GetFrobRight();
+        Object.Teleport(wasAt, vector(), vector(), self);
+        Container.MoveAllContents(self, inv, CTF_NONE);
+        Container.Add(frobL, self, 0, CTF_NONE);
+        Container.Add(frobR, self, 0, CTF_NONE);
+        // TODO: a target might need a specific offset, e.g. at statue head
+        //       position, or just in front of painting face. Set the offset
+        //       accordingly.
+        local offset = vector(0.0,0.0,2.0);
+        local toPos = Object.Position(target) + offset;
+        local toFacing = Object.Facing(self);
         // Rotate facing 180 so player is looking back to where they came from:
-        local z = targetFacing.z + 180.0;
-        if (z>=360.0) z -= 360.0;
-        targetFacing.z = z;
         // TODO: is that good? do we want instead to aim at... where?
-        local targetPos = Object.Position(self) + vector(0.0,0.0,2.0);
-        Object.Teleport(anchor, targetPos, targetFacing);
+        local z = toFacing.z + 180.0;
+        if (z>=360.0) z -= 360.0;
+        toFacing.z = z;
+        Object.Teleport(anchor, toPos, toFacing);
         // TODO: if we want a fade to black, we apparently need to start it
         //       before the teleport??? or maybe that is just a not-doing-it-
         //       via-script thing.
-        Object.Teleport(player, vector(), vector(), anchor);
-        Link.Create("PhysAttach", player, anchor);
+        Object.Teleport(self, vector(), vector(), anchor);
+        Link.Create("PhysAttach", self, anchor);
         // NOTE: If the anchor the player is PhysAttached to is stationary,
         //       then the player can only turn the camera horizontally, not
         //       vertically. It makes no sense, but that is what happens.
@@ -77,41 +187,59 @@ class Mimic extends SqRootScript {
         Physics.SetGravity(anchor, 0.0);
         Physics.ControlVelocity(anchor, vector(0,0,0.1));
 
+        // NOTE: We prevent frobbing most objects while embodied by generously
+        //       adding this metaproperty to all physical objects. This won't
+        //       work for any objects in e.g. the fnord or SFX trees have been
+        //       made frobbable; and it won't work for concrete objects with
+        //       a direct FrobInfo property on them making them frobbable.
+        //       Those must be avoided when using this script.
+        // NOTE: The PossessFrobs are both fnords *and* have a direct FrobInfo
+        //       property, so they will be unaffected, as they need to be.
+        // NOTE: If we only need right-frob, then we can change PossessFrobRight
+        //       to be a junk item, because *nothing* can be frobbed while
+        //       holding a junk item.
+        Object.AddMetaPropertyToMany("M-NoFrobWhileEmbodied", "@physical");
+
         // TEMP: we don't have a way to manually detach yet, so automate it.
         SetOneShotTimer("TempDetach", 25.0);
     }
 
-    function EndEmbodiment() {
-        local player = Object.Named("Player");
-        local anchor = Object.Named("PlayerAnchor");
-        local inv = Object.Named("PlayerInv");
-        local wasAt = Object.Named("PlayerWasAt");
-        local detachorL = Object.Named("PlayerDetachorLeft");
-        local detachorR = Object.Named("PlayerDetachorRight");
-        local link = Link.GetOne("PhysAttach", player, anchor);
-        if (link==0) {
-            // If the player is not attached to us, why are we even here?
+    function EndPossession() {
+        if (! IsPossessing()) {
+            print("ERROR! Tried to unpossess when not possessing. Fix this bug!");
             return false;
         }
+        local anchor = Possess.GetAnchor();
+        local wasAt = Possess.GetWasAt();
+        local inv = Possess.GetInventory();
+        local frobL = Possess.GetFrobLeft();
+        local frobR = Possess.GetFrobRight();
+        local link = Link.GetOne("PhysAttach", self, anchor);
+        if (link==0) {
+            print("ERROR! Tried to unpossess when not PhysAttached. Fix this bug!");
+            return false;
+        }
+        SetData("IsPossessing", false);
         Link.Destroy(link);
-        Object.Teleport(player, vector(), vector(), wasAt);
-        Container.Remove(detachorL, player);
-        Container.Remove(detachorR, player);
-        Container.MoveAllContents(inv, player, CTF_NONE);
+        // Restore player position.
+        Object.Teleport(self, vector(), vector(), wasAt);
+        // Restore inventory.
+        Container.Remove(frobL, self);
+        Container.Remove(frobR, self);
+        // TODO: will need to suppress loot sounds... maybe by making a custom
+        //       squirrel LootSounds to use in preference to gen's?
+        Container.MoveAllContents(inv, self, CTF_NONE);
         // Park the anchor back at the origin ready for next time.
         Physics.StopControlVelocity(anchor);
         Object.Teleport(anchor, vector(), vector());
         Physics.ControlCurrentPosition(anchor);
-    }
-
-    function OnFrobWorldEnd() {
-        //Camera.DynamicAttach(self);
-        BeginEmbodiment();
+        // Restore frobs.
+        Object.RemoveMetaPropertyFromMany("M-NoFrobWhileEmbodied", "@physical");
     }
 
     function OnTimer() {
         if (message().name=="TempDetach") {
-            EndEmbodiment();
+            EndPossession();
         }
     }
 }
@@ -122,7 +250,7 @@ class Mimic extends SqRootScript {
 //       frobs are underway, clearing weapon/item cancels then without a cancel
 //       message (unless...? is that when message().Abort is true??)
 
-class DetachorLeft extends SqRootScript {
+class PossessFrobLeft extends SqRootScript {
     function OnContained() {
         // Make sure we are selected immediately.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
@@ -168,7 +296,7 @@ class DetachorLeft extends SqRootScript {
     }
 }
 
-class DetachorRight extends SqRootScript {
+class PossessFrobRight extends SqRootScript {
     function OnContained() {
         // Make sure we are selected immediately.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
@@ -196,7 +324,7 @@ class DetachorRight extends SqRootScript {
         // NOTE: if we detach while the button is held, we get a
         //       FrobInvBegin message when the button is released,
         //       instead of a FrobInvEnd!
-        // TODO: investigate if the same is true for FrobWorld and DetachorLeft
+        // TODO: investigate if the same is true for FrobWorld and PossessFrobLeft
         // TODO: is that when message().Abort is true?
         // TODO: handle that, if detach is forced and not happening
         //       as a result of clicks. e.g., just ignore all frob messages when
@@ -227,7 +355,7 @@ class DetachorRight extends SqRootScript {
         if (true) {
             print("TEMP: prevent timing out/deselection");
             // NOTE: Using DarkUI.InvSelect(self) doesn't work to refresh the
-            //       DetachorRight; but usinv inv_select *does* work:
+            //       PossessFrobRight; but usinv inv_select *does* work:
             Debug.Command("inv_select "+Object.GetName(self));
         }
     }
