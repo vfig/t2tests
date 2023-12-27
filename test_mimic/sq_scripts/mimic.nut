@@ -89,6 +89,7 @@ Possess <- {
             Property.Set(frobLeft, "FrobInfo", "Inv Action", 2|16); // Script|FocusScript
             Property.Set(frobLeft, "FrobInfo", "Tool Action", 2|16); // Script|FocusScript
             Property.SetSimple(frobLeft, "InvType", 2); // Weapon
+            Property.SetSimple(frobLeft, "NoDrop", true);
             Property.Set(frobLeft, "Scripts", "Script 0", "PossessFrobLeft");
             // TODO: we don't want to render it like this, except for debug, right?
             // TODO: the resource doesn't load if we only set it at runtime like
@@ -105,6 +106,7 @@ Possess <- {
             Property.Set(frobRight, "FrobInfo", "Inv Action", 2|16); // Script|FocusScript
             Property.Set(frobRight, "FrobInfo", "Tool Action", 0); // [None]
             Property.SetSimple(frobRight, "InvType", 1); // Item
+            Property.SetSimple(frobRight, "NoDrop", true);
             Property.Set(frobRight, "Scripts", "Script 0", "PossessFrobRight");
             // TODO: we don't want to render it like this, except for debug, right?
             // TODO: the resource doesn't load if we only set it at runtime like
@@ -306,6 +308,15 @@ class PossessFrobLeft extends SqRootScript {
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
+    function OnFrobInvBegin() {
+        // Player left-clicked while embodied.
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+
+    function OnFrobInvEnd() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+
     function OnFrobToolBegin() {
         // Player left-clicked while embodied and looking at a frobbable.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
@@ -367,10 +378,12 @@ class PossessFrobRight extends SqRootScript {
         // TODO: handle that, if detach is forced and not happening
         //       as a result of clicks. e.g., just ignore all frob messages when
         //       player is not embodied.
+        print("right inv");
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
     function OnFrobInvEnd() {
+        print("right inv");
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
