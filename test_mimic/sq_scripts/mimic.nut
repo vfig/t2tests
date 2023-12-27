@@ -25,10 +25,34 @@ PhysAttach
 */
 
 class PossessMe extends SqRootScript {
+    function ParseVector(s) {
+        local v = vector();
+        local at = 0;
+        local i = s.find(",", at);
+        if (i == null) throw("must be a vector of 3 floats");
+        v.x = (s.slice(at, i)).tofloat();
+        at = i+1;
+        i = s.find(",", at);
+        if (i == null) throw("must be a vector of 3 floats");
+        v.y = (s.slice(at, i)).tofloat();
+        at = i+1;
+        v.z = (s.slice(at)).tofloat();
+        return v;
+    }
+
+    function GetPossessOffset() {
+        local params = userparams();
+        local offset = vector();
+        if ("PossessOffset" in params) {
+            offset = ParseVector(params.PossessOffset);
+        }
+        return offset;
+    }
+
     function OnFrobWorldEnd() {
         local frobber = message().Frobber;
         if (Object.InheritsFrom(frobber, "Avatar")) {
-            SendMessage(frobber, "PossessMe");
+            SendMessage(frobber, "PossessMe", GetPossessOffset());
         }
     }
 }
@@ -140,7 +164,9 @@ class Possessor extends SqRootScript {
             Reply(false);
             return;
         } else {
-            BeginPossession(message().from);
+            local offset = message().data;
+            if (offset==null) offset = vector();
+            BeginPossession(message().from, offset);
         }
     }
 
@@ -148,7 +174,7 @@ class Possessor extends SqRootScript {
         if (IsPossessing()) {
             // If we pick up anything while possessed, send it to join the
             // rest of the player inventory. We don't normally expect this
-            // to happen, as we are using M-NoFrobWhileEmbodied to make all
+            // to happen, as we are using M-NoFrobWhilePossessed to make all
             // the things unfrobbable. But maybe you want to disable that; or
             // maybe a script would have given you items; or maybe something
             // else. Let's just be robust here, shall we?
@@ -172,7 +198,7 @@ class Possessor extends SqRootScript {
         }
     }
 
-    function BeginPossession(target) {
+    function BeginPossession(target, offset) {
         if (IsPossessing()) {
             print("ERROR! Tried to possess when already possessing. Fix this bug!");
             return false;
@@ -193,11 +219,18 @@ class Possessor extends SqRootScript {
         // NOTE: we set IsPossessing *after* inventory transfer, so that we can
         //       safely check it in Container messages.
         SetData("IsPossessing", true);
-        // TODO: a target might need a specific offset, e.g. at statue head
-        //       position, or just in front of painting face. Set the offset
-        //       accordingly.
-        local offset = vector(0.0,0.0,2.0);
-        local toPos = Object.Position(target) + offset;
+        // Get the player's head position relative to their origin. Headbob and
+        // lean will affect this a little, but we are ignoring that. The main
+        // thing is to properly handle standing vs crouched difference.
+        local playerHeadPos = vector();
+        local ignoreFacing = vector();
+        Object.CalcRelTransform(self, self, playerHeadPos, ignoreFacing, 4, 0); // RelSubPhysModel, PLAYER_HEAD
+        // NOTE: The camera position apparently is not at the center of the
+        //       player's head submodel. So we add in a little fudge factor
+        //       to get the camera to end up right about where the offset
+        //       we were supplied with would indicate.
+        offset = offset+vector(0.0,0.0,playerHeadPos.z-0.75);
+        local toPos = Object.ObjectToWorld(target, offset);
         local toFacing = Object.Facing(self);
         // Rotate facing 180 so player is looking back to where they came from:
         // TODO: is that good? do we want instead to aim at... where?
@@ -223,7 +256,7 @@ class Possessor extends SqRootScript {
         Physics.SetGravity(anchor, 0.0);
         Physics.ControlVelocity(anchor, vector(0,0,0.1));
 
-        // NOTE: We prevent frobbing most objects while embodied by generously
+        // NOTE: We prevent frobbing most objects while possessed by generously
         //       adding this metaproperty to all physical objects. This won't
         //       work for any objects in e.g. the fnord or SFX trees have been
         //       made frobbable; and it won't work for concrete objects with
@@ -234,7 +267,7 @@ class Possessor extends SqRootScript {
         // NOTE: If we only need right-frob, then we can change PossessFrobRight
         //       to be a junk item, because *nothing* can be frobbed while
         //       holding a junk item.
-        Object.AddMetaPropertyToMany("M-NoFrobWhileEmbodied", "@physical");
+        Object.AddMetaPropertyToMany("M-NoFrobWhilePossessed", "@physical");
 
         // TEMP: we don't have a way to manually detach yet, so automate it.
         SetOneShotTimer("TempDetach", 5.0);
@@ -274,7 +307,7 @@ class Possessor extends SqRootScript {
         Object.Teleport(anchor, vector(), vector());
         Physics.ControlCurrentPosition(anchor);
         // Restore frobs.
-        Object.RemoveMetaPropertyFromMany("M-NoFrobWhileEmbodied", "@physical");
+        Object.RemoveMetaPropertyFromMany("M-NoFrobWhilePossessed", "@physical");
     }
 
     function OnTimer() {
@@ -300,7 +333,7 @@ class PossessFrobLeft extends SqRootScript {
     }
 
     function OnFrobWorldBegin() {
-        // Player left-clicked while embodied.
+        // Player left-clicked while possessed.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
@@ -309,7 +342,7 @@ class PossessFrobLeft extends SqRootScript {
     }
 
     function OnFrobInvBegin() {
-        // Player left-clicked while embodied.
+        // Player left-clicked while possessed.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
@@ -318,7 +351,7 @@ class PossessFrobLeft extends SqRootScript {
     }
 
     function OnFrobToolBegin() {
-        // Player left-clicked while embodied and looking at a frobbable.
+        // Player left-clicked while possessed and looking at a frobbable.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
@@ -360,8 +393,8 @@ class PossessFrobRight extends SqRootScript {
         //       enabling Script+FocusScript for Tool frobs isn't a whole solution,
         //       as it makes the item do the move-to-center behaviour, that we
         //       do *not* want.
-        //       fallback workaround if needed: when becoming embodied, we mass-
-        //       add a "NoFrobWhenEmbodied" metaprop to all non-embodyable objects?
+        //       fallback workaround if needed: when becoming possessed, we mass-
+        //       add a "NoFrobWhenPossessed" metaprop to all non-embodyable objects?
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
 
@@ -377,7 +410,7 @@ class PossessFrobRight extends SqRootScript {
         // TODO: is that when message().Abort is true?
         // TODO: handle that, if detach is forced and not happening
         //       as a result of clicks. e.g., just ignore all frob messages when
-        //       player is not embodied.
+        //       player is not possessed.
         print("right inv");
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
     }
