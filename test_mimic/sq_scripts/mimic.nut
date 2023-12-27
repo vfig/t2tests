@@ -91,6 +91,8 @@ Possess <- {
             Property.SetSimple(frobLeft, "InvType", 2); // Weapon
             Property.Set(frobLeft, "Scripts", "Script 0", "PossessFrobLeft");
             // TODO: we don't want to render it like this, except for debug, right?
+            // TODO: the resource doesn't load if we only set it at runtime like
+            //       this! probably need an archetype with this property set.
             Property.Set(frobLeft, "InvRendType", "Resource", "webgar3");
             Property.Set(frobLeft, "InvRendType", "Type", "Alternate Bitmap");
             Object.EndCreate(frobLeft);
@@ -105,6 +107,8 @@ Possess <- {
             Property.SetSimple(frobRight, "InvType", 1); // Item
             Property.Set(frobRight, "Scripts", "Script 0", "PossessFrobRight");
             // TODO: we don't want to render it like this, except for debug, right?
+            // TODO: the resource doesn't load if we only set it at runtime like
+            //       this! probably need an archetype with this property set.
             Property.Set(frobRight, "InvRendType", "Resource", "zombieca");
             Property.Set(frobRight, "InvRendType", "Type", "Alternate Bitmap");
             Object.EndCreate(frobRight);
@@ -138,6 +142,34 @@ class Possessor extends SqRootScript {
         }
     }
 
+    function OnContainer() {
+        if (IsPossessing()) {
+            // If we pick up anything while possessed, send it to join the
+            // rest of the player inventory. We don't normally expect this
+            // to happen, as we are using M-NoFrobWhileEmbodied to make all
+            // the things unfrobbable. But maybe you want to disable that; or
+            // maybe a script would have given you items; or maybe something
+            // else. Let's just be robust here, shall we?
+            local inv = Possess.GetInventory();
+            local frobL = Possess.GetFrobLeft();
+            local frobR = Possess.GetFrobRight();
+            local what = message().containee;
+            if (message().event==eContainsEvent.kContainAdd
+            && what!=frobL && what!=frobR) {
+                Container.Add(what, inv);
+            }
+        }
+    }
+
+    function EnableLootSounds(enable) {
+        // Requires 'lootsounds.nut' that defines the global EnableLootSounds()
+        if (("EnableLootSounds") in getroottable()) {
+            ::EnableLootSounds(enable);
+        } else {
+            print("Warning: global EnableLootSounds() not defined; loot sounds are going to happen.");
+        }
+    }
+
     function BeginPossession(target) {
         if (IsPossessing()) {
             print("ERROR! Tried to possess when already possessing. Fix this bug!");
@@ -147,7 +179,6 @@ class Possessor extends SqRootScript {
             print("ERROR! Tried to possess when PhysAttached. Fix this bug!");
             return false;
         }
-        SetData("IsPossessing", true);
         local anchor = Possess.GetAnchor();
         local wasAt = Possess.GetWasAt();
         local inv = Possess.GetInventory();
@@ -157,6 +188,9 @@ class Possessor extends SqRootScript {
         Container.MoveAllContents(self, inv, CTF_NONE);
         Container.Add(frobL, self, 0, CTF_NONE);
         Container.Add(frobR, self, 0, CTF_NONE);
+        // NOTE: we set IsPossessing *after* inventory transfer, so that we can
+        //       safely check it in Container messages.
+        SetData("IsPossessing", true);
         // TODO: a target might need a specific offset, e.g. at statue head
         //       position, or just in front of painting face. Set the offset
         //       accordingly.
@@ -201,7 +235,7 @@ class Possessor extends SqRootScript {
         Object.AddMetaPropertyToMany("M-NoFrobWhileEmbodied", "@physical");
 
         // TEMP: we don't have a way to manually detach yet, so automate it.
-        SetOneShotTimer("TempDetach", 25.0);
+        SetOneShotTimer("TempDetach", 5.0);
     }
 
     function EndPossession() {
@@ -219,16 +253,20 @@ class Possessor extends SqRootScript {
             print("ERROR! Tried to unpossess when not PhysAttached. Fix this bug!");
             return false;
         }
+        // NOTE: we clear IsPossessing *before* inventory restoration, so that we
+        //       don't react to the Container messages.
         SetData("IsPossessing", false);
         Link.Destroy(link);
         // Restore player position.
         Object.Teleport(self, vector(), vector(), wasAt);
-        // Restore inventory.
+        // Restore inventory, setting the global flag to prevent loot sounds.
+        EnableLootSounds(false);
         Container.Remove(frobL, self);
         Container.Remove(frobR, self);
         // TODO: will need to suppress loot sounds... maybe by making a custom
         //       squirrel LootSounds to use in preference to gen's?
         Container.MoveAllContents(inv, self, CTF_NONE);
+        EnableLootSounds(true);
         // Park the anchor back at the origin ready for next time.
         Physics.StopControlVelocity(anchor);
         Object.Teleport(anchor, vector(), vector());
