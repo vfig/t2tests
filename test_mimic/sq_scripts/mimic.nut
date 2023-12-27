@@ -78,6 +78,10 @@ Possess <- {
         return Object.Named("PossessFrobRight");
     }
 
+    function GetGhost() {
+        return Object.Named("PossessGhost");
+    }
+
     function CreateFnords() {
         local anchor = Possess.GetAnchor();
         if (anchor==0) {
@@ -139,6 +143,14 @@ Possess <- {
             Property.Set(frobRight, "InvRendType", "Type", "Alternate Bitmap");
             Object.EndCreate(frobRight);
         }
+        local ghost = Possess.GetGhost();
+        if (ghost==0) {
+            ghost = Object.BeginCreate("fnord");
+            Object.SetName(ghost, "PossessGhost");
+            Property.SetSimple(ghost, "RenderType", 1); // Not Rendered
+            Property.SetSimple(ghost, "ModelName", "playbox");
+            Object.EndCreate(ghost);
+        }
     }
 };
 
@@ -148,6 +160,12 @@ class Possessor extends SqRootScript {
             if (! IsDataSet("IsPossessing")) {
                 SetData("IsPossessing", false);
             }
+            if (! IsDataSet("IsTargeting")) {
+                SetData("IsTargeting", false);
+            }
+            if (! IsDataSet("TargetingTimer")) {
+                SetData("TargetingTimer", 0);
+            }
             Possess.CreateFnords();
         } else {
             // We are probably the starting point. Do nothing.
@@ -156,6 +174,25 @@ class Possessor extends SqRootScript {
 
     function IsPossessing() {
         return (!! GetData("IsPossessing"));
+    }
+
+    function IsTargeting() {
+        return (!! GetData("IsTargeting"));
+    }
+
+    function GetPossessedLink() {
+        foreach (link in Link.GetAll("ScriptParams")) {
+            if (LinkTools.LinkGetData(link, "")=="Possessed") {
+                return link;
+            }
+        }
+        return 0;
+    }
+
+    function GetPossessedObject() {
+        local link = GetPossessedLink();
+        if (link==0) return 0;
+        return LinkDest(link);
     }
 
     function OnPossessMe() {
@@ -187,6 +224,37 @@ class Possessor extends SqRootScript {
                 Container.Add(what, inv);
             }
         }
+    }
+
+    function OnFrobLeftBegin() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+
+    function OnFrobLeftEnd() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+
+    function OnFrobLeftAbort() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+
+    function OnFrobRightBegin() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        BeginTargeting();
+        if (! IsTargeting) {
+            SetData("IsTargeting", true);
+            // TODO: start raycasting every frame
+        }
+    }
+
+    function OnFrobRightEnd() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        EndTargeting(true);
+    }
+
+    function OnFrobRightAbort() {
+        print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        EndTargeting(false);
     }
 
     function EnableLootSounds(enable) {
@@ -250,7 +318,9 @@ class Possessor extends SqRootScript {
         //       but it works for us.
         Physics.SetGravity(anchor, 0.0);
         Physics.ControlVelocity(anchor, vector(0,0,0.1));
-
+        // And keep track of what we are possessing.
+        local link = Link.Create("ScriptParams", self, target);
+        LinkTools.LinkSetData(link, "", "Possessed");
         // NOTE: We prevent frobbing most objects while possessed by generously
         //       adding this metaproperty to all physical objects. This won't
         //       work for any objects in e.g. the fnord or SFX trees have been
@@ -265,7 +335,7 @@ class Possessor extends SqRootScript {
         Object.AddMetaPropertyToMany("M-NoFrobWhilePossessed", "@physical");
 
         // TEMP: we don't have a way to manually detach yet, so automate it.
-        SetOneShotTimer("TempDetach", 5.0);
+        //SetOneShotTimer("TempDetach", 5.0);
     }
 
     function EndPossession() {
@@ -273,19 +343,26 @@ class Possessor extends SqRootScript {
             print("ERROR! Tried to unpossess when not possessing. Fix this bug!");
             return false;
         }
+        EndTargeting(false);
+        // NOTE: we must clear IsPossessing *before* inventory restoration, so
+        //       that we won't react to the Container messages.
+        SetData("IsPossessing", false);
         local anchor = Possess.GetAnchor();
         local wasAt = Possess.GetWasAt();
         local inv = Possess.GetInventory();
         local frobL = Possess.GetFrobLeft();
         local frobR = Possess.GetFrobRight();
+        // Disconnect from the anchor.
         local link = Link.GetOne("PhysAttach", self, anchor);
         if (link==0) {
-            print("ERROR! Tried to unpossess when not PhysAttached. Fix this bug!");
-            return false;
+            print("ERROR! Unpossessed when not PhysAttached. Fix this bug!");
         }
-        // NOTE: we clear IsPossessing *before* inventory restoration, so that we
-        //       don't react to the Container messages.
-        SetData("IsPossessing", false);
+        Link.Destroy(link);
+        // Disconnect from the possessed target.
+        link = GetPossessedLink();
+        if (link==0) {
+            print("ERROR! Unpossessed with no ScriptParams('Possessed') link. Fix this bug!");
+        }
         Link.Destroy(link);
         // Restore player position.
         Object.Teleport(self, vector(), vector(), wasAt);
@@ -305,9 +382,82 @@ class Possessor extends SqRootScript {
         Object.RemoveMetaPropertyFromMany("M-NoFrobWhilePossessed", "@physical");
     }
 
+    function BeginTargeting() {
+        if (IsTargeting()) return false;
+        SetData("IsTargeting", true);
+        EnableTargetingTimer(true);
+        local ghost = Possess.GetGhost();
+        Property.SetSimple(ghost, "RenderType", 2); // Unlit
+    }
+
+    function EndTargeting(commit) {
+        if (! IsTargeting()) return false;
+        SetData("IsTargeting", false);
+        EnableTargetingTimer(false);
+        local ghost = Possess.GetGhost();
+        Property.SetSimple(ghost, "RenderType", 1); // Not Rendered
+        if (commit) {
+            // TODO: need to handle moving the player to the targeted position
+            //       (if there is a valid one)!
+            EndPossession();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function DoTargeting() {
+        // NOTE: Camera coordinates for CameraToWorld are x-forward, z-up.
+        const max_distance = 20.0;
+        local from = Camera.GetPosition();
+        local to = Camera.CameraToWorld(vector(max_distance,0.0,0.0));
+
+        local hit_object = object();
+        local hit_location = vector();
+        local hit = Engine.ObjRaycast(from, to, hit_location, hit_object,
+            0,          // Always find the nearest object, not just line-of-sight.
+            0x2,        // Include meshes but ignore invisible objects.
+            "Player",               // Ignore the player.
+            Possess.GetGhost());    // Ignore the ghost.
+        // TODO: if the hit is GetPossessedObject(), we need to disregard that!
+        // TODO: if the hit has no physics, then what? redo the raycast ignoring
+        //       it too?? particles? decals? this is maybe awkward...
+        local msg;
+        if (hit==0) {
+            msg = "no hit";
+        } else {
+            // 1 for terrain, 2 for an object, 3 for mesh object. For return
+            // types 2 and 3, the hit object will be returned in 'hit_object'.
+            msg = "hit type "+hit+", objid "+hit_object+" name:"+Object.GetName(hit_object.tointeger());
+        }
+        DarkUI.TextMessage(msg, 0, 100);
+
+        local ghost = Possess.GetGhost();
+        Object.Teleport(ghost, hit_location, vector());
+    }
+
+    function EnableTargetingTimer(enable) {
+        local timer = GetData("TargetingTimer");
+        if (enable && timer==0) {
+            timer = SetOneShotTimer("DoTargeting", 0.030);
+            SetData("TargetingTimer", timer);
+        }
+        if (!enable && timer!=0) {
+            KillTimer(timer);
+            SetData("TargetingTimer", 0);
+        }
+    }
+
     function OnTimer() {
         if (message().name=="TempDetach") {
             EndPossession();
+            return;
+        }
+        if (message().name=="DoTargeting") {
+            SetData("TargetingTimer", 0);
+            EnableTargetingTimer(true);
+            DoTargeting();
+            return;
         }
     }
 }
@@ -339,10 +489,18 @@ class PossessFrobLeft extends SqRootScript {
     function OnFrobInvBegin() {
         // Player left-clicked while possessed.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        local player = Object.Named("Player");
+        if (message().Abort) {
+            SendMessage("Player", "FrobLeftAbort");
+        } else {
+            SendMessage("Player", "FrobLeftBegin");
+        }
     }
 
     function OnFrobInvEnd() {
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        local player = Object.Named("Player");
+        SendMessage("Player", "FrobLeftEnd");
     }
 
     function OnFrobToolBegin() {
@@ -408,11 +566,19 @@ class PossessFrobRight extends SqRootScript {
         //       player is not possessed.
         print("right inv");
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        local player = Object.Named("Player");
+        if (message().Abort) {
+            SendMessage("Player", "FrobRightAbort");
+        } else {
+            SendMessage("Player", "FrobRightBegin");
+        }
     }
 
     function OnFrobInvEnd() {
         print("right inv");
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        local player = Object.Named("Player");
+        SendMessage("Player", "FrobRightEnd");
     }
 
     function OnInvDeSelect() {
