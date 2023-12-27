@@ -231,12 +231,7 @@ class Possessor extends SqRootScript {
         //       we were supplied with would indicate.
         offset = offset+vector(0.0,0.0,playerHeadPos.z-0.75);
         local toPos = Object.ObjectToWorld(target, offset);
-        local toFacing = Object.Facing(self);
-        // Rotate facing 180 so player is looking back to where they came from:
-        // TODO: is that good? do we want instead to aim at... where?
-        local z = toFacing.z + 180.0;
-        if (z>=360.0) z -= 360.0;
-        toFacing.z = z;
+        local toFacing = Object.Facing(target);
         Object.Teleport(anchor, toPos, toFacing);
         // TODO: if we want a fade to black, we apparently need to start it
         //       before the teleport??? or maybe that is just a not-doing-it-
