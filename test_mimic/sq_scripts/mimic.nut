@@ -58,6 +58,15 @@ class PossessMe extends SqRootScript {
 }
 
 Possess <- {
+    // All these are right out of PHYSAPI.H
+    PLAYER_HEAD = 0,
+    PLAYER_FOOT = 1,
+    PLAYER_BODY = 2,
+    PLAYER_KNEE = 3,
+    PLAYER_SHIN = 4,
+    PLAYER_RADIUS = 1.2,
+    PLAYER_HEIGHT = 6.0,
+
     function GetAnchor() {
         return Object.Named("PossessAnchor");
     }
@@ -80,6 +89,18 @@ Possess <- {
 
     function GetGhost() {
         return Object.Named("PossessGhost");
+    }
+
+    function GetHeadProbe() {
+        return Object.Named("PossessHeadProbe");
+    }
+
+    function GetBodyProbe() {
+        return Object.Named("PossessBodyProbe");
+    }
+
+    function GetFootProbe() {
+        return Object.Named("PossessFootProbe");
     }
 
     function CreateFnords() {
@@ -151,6 +172,54 @@ Possess <- {
             Property.SetSimple(ghost, "ModelName", "playbox");
             Object.EndCreate(ghost);
         }
+        local headProbe = Possess.GetHeadProbe();
+        if (headProbe==0) {
+            headProbe = Object.BeginCreate("fnord");
+            Object.SetName(headProbe, "PossessHeadProbe");
+            Property.Set(headProbe, "PhysType", "Type", 1);
+            Property.Set(headProbe, "PhysType", "# Submodels", 1);
+            Property.Set(headProbe, "PhysDims", "Radius 1", PLAYER_RADIUS);
+            Property.Set(headProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
+            Property.Set(headProbe, "CollisionType", "", 0); // None
+            Property.Set(headProbe, "PhysAIColl", "", false);
+            Property.Set(headProbe, "RenderType", "", 1); // Not Rendered
+            Object.Teleport(headProbe, vector(0,0,0), vector(0,0,0), 0);
+            Physics.ControlCurrentLocation(headProbe);
+            Physics.ControlCurrentRotation(headProbe);
+            Object.EndCreate(headProbe);
+        }
+        local bodyProbe = Possess.GetBodyProbe();
+        if (bodyProbe==0) {
+            bodyProbe = Object.BeginCreate("fnord");
+            Object.SetName(bodyProbe, "PossessBodyProbe");
+            Property.Set(bodyProbe, "PhysType", "Type", 1);
+            Property.Set(bodyProbe, "PhysType", "# Submodels", 1);
+            Property.Set(bodyProbe, "PhysDims", "Radius 1", PLAYER_RADIUS);
+            Property.Set(bodyProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
+            Property.Set(bodyProbe, "CollisionType", "", 0); // None
+            Property.Set(bodyProbe, "PhysAIColl", "", false);
+            Property.Set(bodyProbe, "RenderType", "", 1); // Not Rendered
+            Object.Teleport(bodyProbe, vector(0,0,0), vector(0,0,0), 0);
+            Physics.ControlCurrentLocation(bodyProbe);
+            Physics.ControlCurrentRotation(bodyProbe);
+            Object.EndCreate(bodyProbe);
+        }
+        local footProbe = Possess.GetFootProbe();
+        if (footProbe==0) {
+            footProbe = Object.BeginCreate("fnord");
+            Object.SetName(footProbe, "PossessFootProbe");
+            Property.Set(footProbe, "PhysType", "Type", 1);
+            Property.Set(footProbe, "PhysType", "# Submodels", 1);
+            Property.Set(footProbe, "PhysDims", "Radius 1", 0.0);
+            Property.Set(footProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
+            Property.Set(footProbe, "CollisionType", "", 0); // None
+            Property.Set(footProbe, "PhysAIColl", "", false);
+            Property.Set(footProbe, "RenderType", "", 1); // Not Rendered
+            Object.Teleport(footProbe, vector(0,0,0), vector(0,0,0), 0);
+            Physics.ControlCurrentLocation(footProbe);
+            Physics.ControlCurrentRotation(footProbe);
+            Object.EndCreate(footProbe);
+        }
     }
 };
 
@@ -165,6 +234,24 @@ class Possessor extends SqRootScript {
             }
             if (! IsDataSet("TargetingTimer")) {
                 SetData("TargetingTimer", 0);
+            }
+            if (! IsDataSet("IsTargetValid")) {
+                SetData("IsTargetValid", false);
+            }
+            if (! IsDataSet("TargetPosition")) {
+                SetData("TargetPosition", vector());
+            }
+            if (! IsDataSet("TargetFacing")) {
+                SetData("TargetFacing", vector());
+            }
+            if (! IsDataSet("PlayerHeadOffset")) {
+                SetData("PlayerHeadOffset", vector());
+            }
+            if (! IsDataSet("PlayerBodyOffset")) {
+                SetData("PlayerBodyOffset", vector());
+            }
+            if (! IsDataSet("PlayerFootOffset")) {
+                SetData("PlayerFootOffset", vector());
             }
             Possess.CreateFnords();
         } else {
@@ -287,17 +374,37 @@ class Possessor extends SqRootScript {
         // NOTE: we set IsPossessing *after* inventory transfer, so that we can
         //       safely check it in Container messages.
         SetData("IsPossessing", true);
-        // Get the player's head position relative to their origin. Headbob and
-        // lean will affect this a little, but we are ignoring that. The main
-        // thing is to properly handle standing vs crouched difference.
-        local playerHeadPos = vector();
+
+        // Get the player's head and body position relative to their origin.
+        // Headbob and lean will affect this a little, but we are ignoring that.
+        // The main thing is to properly handle standing vs crouched difference.
+        // NOTE: CalcRelTransform() returns the position of the child object
+        //       relative to the given submodel of the parent object; but we
+        //       want the submodel position relative to the parent origin,
+        //       which is the inverse; hence the negations.
+        local submodelOffset = vector();
         local ignoreFacing = vector();
-        Object.CalcRelTransform(self, self, playerHeadPos, ignoreFacing, 4, 0); // RelSubPhysModel, PLAYER_HEAD
-        // NOTE: The camera position apparently is not at the center of the
-        //       player's head submodel. So we add in a little fudge factor
-        //       to get the camera to end up right about where the offset
-        //       we were supplied with would indicate.
-        offset = offset+vector(0.0,0.0,playerHeadPos.z-0.75);
+        Object.CalcRelTransform(self, self, submodelOffset, ignoreFacing, 4, Possess.PLAYER_HEAD); // RelSubPhysModel
+        local playerHeadZ = -submodelOffset.z;
+        Object.CalcRelTransform(self, self, submodelOffset, ignoreFacing, 4, Possess.PLAYER_BODY); // RelSubPhysModel
+        local playerBodyZ = -submodelOffset.z;
+        Object.CalcRelTransform(self, self, submodelOffset, ignoreFacing, 4, Possess.PLAYER_FOOT); // RelSubPhysModel
+        local playerFootZ = -submodelOffset.z;
+        // Store the head and body positions so we can restore them when unpossessing.
+        SetData("PlayerHeadOffset", vector(0.0,0.0,playerHeadZ));
+        SetData("PlayerBodyOffset", vector(0.0,0.0,playerBodyZ));
+        SetData("PlayerFootOffset", vector(0.0,0.0,playerFootZ));
+
+        // TODO: delete this crap
+        //                                    // stand / crouch
+        // print("playerHeadZ:"+playerHeadZ); // 1.7 / -0.23
+        // print("playerBodyZ:"+playerBodyZ); // -0.6 / -0.6
+        // print("playerFootZ:"+playerFootZ); // -3 / -3
+
+        // NOTE: The camera position is not at the center of the player's head
+        //       submodel, but 0.8 units higher ("eyeloc"). So we offset the
+        //       camera down by the same amount to counteract this.
+        offset.z -= playerHeadZ+0.8;
         local toPos = Object.ObjectToWorld(target, offset);
         local toFacing = Object.Facing(target);
         Object.Teleport(anchor, toPos, toFacing);
@@ -338,7 +445,7 @@ class Possessor extends SqRootScript {
         //SetOneShotTimer("TempDetach", 5.0);
     }
 
-    function EndPossession() {
+    function EndPossession(position, facing) {
         if (! IsPossessing()) {
             print("ERROR! Tried to unpossess when not possessing. Fix this bug!");
             return false;
@@ -365,7 +472,7 @@ class Possessor extends SqRootScript {
         }
         Link.Destroy(link);
         // Restore player position.
-        Object.Teleport(self, vector(), vector(), wasAt);
+        Object.Teleport(self, position, facing);
         // Restore inventory, setting the global flag to prevent loot sounds.
         EnableLootSounds(false);
         Container.Remove(frobL, self);
@@ -382,12 +489,29 @@ class Possessor extends SqRootScript {
         Object.RemoveMetaPropertyFromMany("M-NoFrobWhilePossessed", "@physical");
     }
 
+    function IsTargetValid() {
+        return GetData("IsTargetValid");
+    }
+
+    function GetTargetPosition() {
+        return GetData("TargetPosition");
+    }
+
+    function GetTargetFacing() {
+        return GetData("TargetFacing");
+    }
+
+    function SetTarget(position, facing, valid) {
+        SetData("IsTargetValid", valid);
+        SetData("TargetPosition", position);
+        SetData("TargetFacing", facing);
+    }
+
     function BeginTargeting() {
         if (IsTargeting()) return false;
         SetData("IsTargeting", true);
+        SetTarget(vector(), vector(), false);
         EnableTargetingTimer(true);
-        local ghost = Possess.GetGhost();
-        Property.SetSimple(ghost, "RenderType", 2); // Unlit
     }
 
     function EndTargeting(commit) {
@@ -396,14 +520,12 @@ class Possessor extends SqRootScript {
         EnableTargetingTimer(false);
         local ghost = Possess.GetGhost();
         Property.SetSimple(ghost, "RenderType", 1); // Not Rendered
-        if (commit) {
-            // TODO: need to handle moving the player to the targeted position
-            //       (if there is a valid one)!
-            EndPossession();
+        if (commit
+        && IsTargetValid()) {
+            EndPossession(GetTargetPosition(), GetTargetFacing());
             return true;
-        } else {
-            return false;
         }
+        return false;
     }
 
     function DoTargeting() {
@@ -411,10 +533,11 @@ class Possessor extends SqRootScript {
         const max_distance = 20.0;
         local from = Camera.GetPosition();
         local to = Camera.CameraToWorld(vector(max_distance,0.0,0.0));
+        local dir = (to-from); dir.Normalize();
 
         local hit_object = object();
-        local hit_location = vector();
-        local hit = Engine.ObjRaycast(from, to, hit_location, hit_object,
+        local hit_position = vector();
+        local hit = Engine.ObjRaycast(from, to, hit_position, hit_object,
             0,          // Always find the nearest object, not just line-of-sight.
             0x2,        // Include meshes but ignore invisible objects.
             "Player",               // Ignore the player.
@@ -422,23 +545,73 @@ class Possessor extends SqRootScript {
         // TODO: if the hit is GetPossessedObject(), we need to disregard that!
         // TODO: if the hit has no physics, then what? redo the raycast ignoring
         //       it too?? particles? decals? this is maybe awkward...
-        local msg;
-        if (hit==0) {
-            msg = "no hit";
-        } else {
-            // 1 for terrain, 2 for an object, 3 for mesh object. For return
-            // types 2 and 3, the hit object will be returned in 'hit_object'.
-            msg = "hit type "+hit+", objid "+hit_object+" name:"+Object.GetName(hit_object.tointeger());
+        // TODO: maybe fire a high speed projectile (not a clone, keep it around)
+        //       so we get a poor man's physics raycast? see Physics.LaunchProjectile
+        local position = vector();
+        local facing = vector();
+        local valid = false;
+        if (hit) {
+            // Probe the destination to see if it is a valid position for the
+            // player's bits.
+            // TODO: we really need a normal so we can decide whether to treat
+            //       the hit position as the foot position, or whether to walk
+            //       back along it by PLAYER_RADIUS and treat it as a potential
+            //       body position (then phys/raycast down to find the floor).
+            local headOffset = GetData("PlayerHeadOffset");
+            local bodyOffset = GetData("PlayerBodyOffset");
+            local footOffset = GetData("PlayerFootOffset");
+            local headProbe = Possess.GetHeadProbe();
+            local bodyProbe = Possess.GetBodyProbe();
+            local footProbe = Possess.GetFootProbe();
+            Object.Teleport(headProbe, hit_position+headOffset-footOffset, vector());
+            Object.Teleport(bodyProbe, hit_position+bodyOffset-footOffset, vector());
+            Object.Teleport(footProbe, hit_position, vector());
+            local headValid = Physics.ValidPos(headProbe);
+            local bodyValid = Physics.ValidPos(bodyProbe);
+            local footValid = Physics.ValidPos(footProbe);
+
+            local msg = "head:"+headValid+" body:"+bodyValid+" foot:"+footValid;
+            DarkUI.TextMessage(msg, 0, 100);
+
+            valid = (headValid && bodyValid && footValid);
+            if (valid) {
+                position = hit_position-footOffset;
+                facing.z = atan2(dir.y,dir.x)*57.29578; // 180/pi
+            }
         }
-        DarkUI.TextMessage(msg, 0, 100);
 
         local ghost = Possess.GetGhost();
-        Object.Teleport(ghost, hit_location, vector());
+        if (valid) {
+            SetTarget(position, facing, true);
+            // make ghost face the other way
+            // TODO: delete this, its just convenient for the playbox ghost
+            local invAngle = facing.z+180.0;
+            if (invAngle>=360.0) invAngle -= 360.0;
+            Object.Teleport(ghost, position, vector(0.0,0.0,invAngle));
+            Property.SetSimple(ghost, "RenderType", 2); // Unlit
+        } else {
+            SetTarget(position, facing, false);
+            Property.SetSimple(ghost, "RenderType", 1); // Not Rendered
+        }
+
+        // TODO: delete:
+        // local msg;
+        // if (hit==0) {
+        //     msg = "no hit";
+        // } else {
+        //     // 1 for terrain, 2 for an object, 3 for mesh object. For return
+        //     // types 2 and 3, the hit object will be returned in 'hit_object'.
+        //     msg = "hit type "+hit+", objid "+hit_object+" name:"+Object.GetName(hit_object.tointeger());
+        // }
+        // DarkUI.TextMessage(msg, 0, 100);
     }
 
     function EnableTargetingTimer(enable) {
         local timer = GetData("TargetingTimer");
         if (enable && timer==0) {
+            // TODO: low frequency targeting means the target visuals are
+            //       juddery... but maybe that will go away when we change to
+            //       use particle system visuals?
             timer = SetOneShotTimer("DoTargeting", 0.030);
             SetData("TargetingTimer", timer);
         }
@@ -450,7 +623,8 @@ class Possessor extends SqRootScript {
 
     function OnTimer() {
         if (message().name=="TempDetach") {
-            EndPossession();
+            local wasAt = Possess.GetWasAt();
+            EndPossession(Object.Position(wasAt), Object.Facing(wasAt));
             return;
         }
         if (message().name=="DoTargeting") {
