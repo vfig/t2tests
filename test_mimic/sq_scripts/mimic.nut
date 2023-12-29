@@ -849,7 +849,8 @@ class PossessPhysCastProjectile extends SqRootScript {
     function OnPhysCollision() {
         local hitObj = 0;
         if (message().collType==ePhysCollisionType.kCollTerrain) {
-            // TODO: if we care about the texture, we can get it from message().collObj;
+            // NOTE: if we care about the texture, we can get it here from
+            //       message().collObj.
             hitObj = 0;
         } else if (message().collType==ePhysCollisionType.kCollObject) {
             hitObj = message().collObj;
@@ -858,8 +859,14 @@ class PossessPhysCastProjectile extends SqRootScript {
                 // Ignore collisions with sphere objects.
                 // TODO: we might want to make this size-based instead, so that
                 //       e.g. the raycast will hit a barrel, but not a bottle.
-                Reply(ePhysMessageResult.kPM_Nothing);
-                return;
+                // BUG: this sometimes gets caught up and stops (and maybe later
+                //      continues, like much later if we go over to have a look!)
+                //      and it sometimes goes through, though not without hitching
+                //      up and maybe being weird and slow...
+                // WORKAROUND: for now, just hit sphere objects too.
+                //
+                //Reply(ePhysMessageResult.kPM_Nothing);
+                //return;
             }
         }
 
