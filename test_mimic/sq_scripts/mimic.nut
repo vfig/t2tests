@@ -58,7 +58,7 @@ class PossessMe extends SqRootScript {
 }
 
 Possess <- {
-    // All these are right out of PHYSAPI.H
+    // From PHYSAPI.H:
     PLAYER_HEAD = 0,
     PLAYER_FOOT = 1,
     PLAYER_BODY = 2,
@@ -66,6 +66,17 @@ Possess <- {
     PLAYER_SHIN = 4,
     PLAYER_RADIUS = 1.2,
     PLAYER_HEIGHT = 6.0,
+
+    // From PRJCTILE.H:
+    PRJ_FLG_ZEROVEL = (1 << 0), // ignore launcher velocity
+    PRJ_FLG_PUSHOUT = (1 << 1), // push away from launcher
+    PRJ_FLG_FROMPOS = (1 << 2), // don't init position (only makes sense for concretes)
+    PRJ_FLG_GRAVITY = (1 << 3), // object has gravity if default physics
+    PRJ_FLG_BOWHACK = (1 << 8),  // do all bow hackery
+    PRJ_FLG_TELLAI = (1 << 9),  // tell AIs about this object
+    PRJ_FLG_NOPHYS = (1 <<10),  // create the object without adding physics
+    PRJ_FLG_MASSIVE = (1 <<11),  // slow down the velocity based on  
+    PRJ_FLG_NO_FIRER = (1<<12),  // don't creature firer link
 
     function GetAnchor() {
         return Object.Named("PossessAnchor");
@@ -101,6 +112,24 @@ Possess <- {
 
     function GetFootProbe() {
         return Object.Named("PossessFootProbe");
+    }
+
+    function GetPhysCastProjectile() {
+        local proj = Object.Named("PossessPhysCastProj");
+        if (proj==0) {
+            proj = Object.BeginCreate("PossessPhysCastArch");
+            Object.SetName(proj, "PossessPhysCastProj");
+            // TODO: can i put Transient on the archetype?
+            Property.SetSimple(proj, "Transient", true); // Will not be saved.
+
+            // TODO: remove these:
+            Property.SetSimple(proj, "RenderType", 2); // TEMP: Unlit
+            Property.SetSimple(proj, "ModelName", "unitsfer"); // TEMP
+            Property.SetSimple(proj, "Scale", vector(1,1,1)*0.125); // TEMP
+
+            Object.EndCreate(proj);
+        }
+        return proj;
     }
 
     function CreateFnords() {
@@ -180,13 +209,13 @@ Possess <- {
             Property.Set(headProbe, "PhysType", "# Submodels", 1);
             Property.Set(headProbe, "PhysDims", "Radius 1", PLAYER_RADIUS);
             Property.Set(headProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
-            Property.Set(headProbe, "CollisionType", "", 0); // None
-            Property.Set(headProbe, "PhysAIColl", "", false);
-            Property.Set(headProbe, "RenderType", "", 1); // Not Rendered
+            Property.SetSimple(headProbe, "CollisionType", 0); // None
+            Property.SetSimple(headProbe, "PhysAIColl", false);
+            Property.SetSimple(headProbe, "RenderType", 1); // Not Rendered
             Object.Teleport(headProbe, vector(0,0,0), vector(0,0,0), 0);
+            Object.EndCreate(headProbe);
             Physics.ControlCurrentLocation(headProbe);
             Physics.ControlCurrentRotation(headProbe);
-            Object.EndCreate(headProbe);
         }
         local bodyProbe = Possess.GetBodyProbe();
         if (bodyProbe==0) {
@@ -196,13 +225,13 @@ Possess <- {
             Property.Set(bodyProbe, "PhysType", "# Submodels", 1);
             Property.Set(bodyProbe, "PhysDims", "Radius 1", PLAYER_RADIUS);
             Property.Set(bodyProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
-            Property.Set(bodyProbe, "CollisionType", "", 0); // None
-            Property.Set(bodyProbe, "PhysAIColl", "", false);
-            Property.Set(bodyProbe, "RenderType", "", 1); // Not Rendered
+            Property.SetSimple(bodyProbe, "CollisionType", 0); // None
+            Property.SetSimple(bodyProbe, "PhysAIColl", false);
+            Property.SetSimple(bodyProbe, "RenderType", 1); // Not Rendered
             Object.Teleport(bodyProbe, vector(0,0,0), vector(0,0,0), 0);
+            Object.EndCreate(bodyProbe);
             Physics.ControlCurrentLocation(bodyProbe);
             Physics.ControlCurrentRotation(bodyProbe);
-            Object.EndCreate(bodyProbe);
         }
         local footProbe = Possess.GetFootProbe();
         if (footProbe==0) {
@@ -212,18 +241,40 @@ Possess <- {
             Property.Set(footProbe, "PhysType", "# Submodels", 1);
             Property.Set(footProbe, "PhysDims", "Radius 1", 0.0);
             Property.Set(footProbe, "PhysDims", "Offset 1", vector(0.0, 0.0, 0.0));
-            Property.Set(footProbe, "CollisionType", "", 0); // None
-            Property.Set(footProbe, "PhysAIColl", "", false);
-            Property.Set(footProbe, "RenderType", "", 1); // Not Rendered
+            Property.SetSimple(footProbe, "CollisionType", 0); // None
+            Property.SetSimple(footProbe, "PhysAIColl", false);
+            Property.SetSimple(footProbe, "RenderType", 1); // Not Rendered
             Object.Teleport(footProbe, vector(0,0,0), vector(0,0,0), 0);
+            Object.EndCreate(footProbe);
             Physics.ControlCurrentLocation(footProbe);
             Physics.ControlCurrentRotation(footProbe);
-            Object.EndCreate(footProbe);
         }
+    }
+
+    function LaunchProjectile(launcher, from, facing) {
+        local proj = Possess.GetPhysCastProjectile();
+        Object.Teleport(proj, from, facing);
+        local launchedProj = Physics.LaunchProjectile(
+            launcher,
+            proj,
+            0.1,
+            PRJ_FLG_ZEROVEL|PRJ_FLG_FROMPOS|PRJ_FLG_NO_FIRER,//|PRJ_FLG_PUSHOUT
+            vector());
+        return proj;
     }
 };
 
 class Possessor extends SqRootScript {
+
+    // NOTE: A "PhysCast" is carried out by launching an invisible projectile
+    //       that, when it collides, will send the Player a PhysCastHit message.
+    //       We can use squirrel member variables to keep track of the physcast
+    //       state safely, because we do *not* want a physcast to persist over
+    //       a save/load. The physcast projectile itself should be marked as
+    //       transient so that it is not saved.
+    // TODO: use this!
+    m_awaitingPhysCastResult = false;
+
     function OnBeginScript() {
         if (Object.InheritsFrom(self, "Avatar")) {
             if (! IsDataSet("IsPossessing")) {
@@ -319,6 +370,7 @@ class Possessor extends SqRootScript {
 
     function OnFrobLeftEnd() {
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+        Possess.LaunchProjectile(self, Camera.GetPosition(), Camera.GetFacing());
     }
 
     function OnFrobLeftAbort() {
@@ -782,6 +834,46 @@ class PossessFrobRight extends SqRootScript {
     function OnMessage() {
         // TEMP: print all other messages we might need to handle.
         print(GetTime()+": "+Object.GetName(self)+" ("+self+"): "+message().message);
+    }
+}
+
+class PossessPhysCastProjectile extends SqRootScript {
+    function OnBeginScript() {
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnPhysCollision() {
+        local hitObj = 0;
+        if (message().collType==ePhysCollisionType.kCollTerrain) {
+            // TODO: if we care about the texture, we can get it from message().collObj;
+            hitObj = 0;
+        } else if (message().collType==ePhysCollisionType.kCollObject) {
+            hitObj = message().collObj;
+            if (Physics.HasPhysics(hitObj)
+            && Physics.IsSphere(hitObj)) {
+                // Ignore collisions with sphere objects.
+                // TODO: we might want to make this size-based instead, so that
+                //       e.g. the raycast will hit a barrel, but not a bottle.
+                Reply(ePhysMessageResult.kPM_Nothing);
+                return;
+            }
+        }
+
+        // TODO: clean up
+        print("Projectile hit:");
+        print("  pos:"+message().collPt);
+        print("  normal:"+message().collNormal);
+        print("  hit obj:"+hitObj);
+
+        SendMessage("Player", "PhysCastHit",
+            message().collPt,       // data
+            message().collNormal,   // data2
+            hitObj);                // data3
+        Reply(ePhysMessageResult.kPM_NonPhys);
     }
 }
 
