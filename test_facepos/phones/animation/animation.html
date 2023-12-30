@@ -8,13 +8,16 @@
 <body>
     <audio id='mutter' src='x_sg11101a.mp3' preload='auto'></audio>
     <table>
-        <tr><th>face_process<th>rhubarb
+        <tr><th>face_process<th>rhubarb<th>rhubarb (phonetic)
         <tr><td><img id='face1' src='face0.png' onclick='toggle_animating()'>
             <td><img id='face2' src='face0.png' onclick='toggle_animating()'>
+            <td><img id='face3' src='face0.png' onclick='toggle_animating()'>
         <tr><td><img id='mouth1' src='mouth0.png' onclick='toggle_animating()'>
             <td><img id='mouth2' src='mouth0.png' onclick='toggle_animating()'>
+            <td><img id='mouth3' src='mouth0.png' onclick='toggle_animating()'>
         <tr><td><img id='guard1' src='guard0.png' onclick='toggle_animating()'>
             <td><img id='guard2' src='guard0.png' onclick='toggle_animating()'>
+            <td><img id='guard3' src='guard0.png' onclick='toggle_animating()'>
     </table>
 
     <div style='opacity: 0.01; height:0px; overflow:hidden;'>
@@ -41,18 +44,22 @@
     <script>
         animating = false;
         // face_process output:
-        thief_frames =   "12222114222444421121122220442222124111142112222222224221102422122124221121100000141424412222211241211442201000000000214411224112241111211112111121111101111111000000122422122222221112211111221121111111110000";
+        thief_frames =    "12222114222444421121122220442222124111142112222222224221102422122124221121100000141424412222211241211442201000000000214411224112241111211112111121111101111111000000122422122222221112211111221121111111110000";
         // rhubarb+phones.py output:
-        rhubarb_frames = "2242024422111111111112222231122244422555233333211333333333333244540042233334444422223222222222225003333322200000000022244444022222222040222440033400444444444222220022110044555543322222220002333333322222000000";
+        rhubarb_frames =  "2242024422111111111112222231122244422555233333211333333333333244540042233334444422223222222222225003333322200000000022244444022222222040222440033400444444444222220022110044555543322222220002333333322222000000";
+        rhubarb_frames2 = "2042222232111111111220020033322224442555542222243331332200552222200042333334444222231133122222222200555422220000000022222220022222233002204444423404000220022224444311111002333223111111110002333333322222200000";
 
         animation_handle = 0;
         audio_element = document.getElementById('mutter');
         face1_element = document.getElementById('face1');
         face2_element = document.getElementById('face2');
+        face3_element = document.getElementById('face3');
         mouth1_element = document.getElementById('mouth1');
         mouth2_element = document.getElementById('mouth2');
+        mouth3_element = document.getElementById('mouth3');
         guard1_element = document.getElementById('guard1');
         guard2_element = document.getElementById('guard2');
+        guard3_element = document.getElementById('guard3');
 
         face_frame_elements = [
             document.getElementById('face_frame0'),
@@ -92,12 +99,16 @@
             if (frame_index < thief_frames.length) {
                 var thief_frame = parseInt(thief_frames.charAt(frame_index));
                 var rhubarb_frame = parseInt(rhubarb_frames.charAt(frame_index));
+                var rhubarb_frame2 = parseInt(rhubarb_frames2.charAt(frame_index));
                 update_img(face1_element, thief_frame, face_frame_elements);
                 update_img(face2_element, rhubarb_frame, face_frame_elements);
+                update_img(face3_element, rhubarb_frame2, face_frame_elements);
                 update_img(mouth1_element, thief_frame, mouth_frame_elements);
                 update_img(mouth2_element, rhubarb_frame, mouth_frame_elements);
+                update_img(mouth3_element, rhubarb_frame2, mouth_frame_elements);
                 update_img(guard1_element, thief_frame, guard_frame_elements);
                 update_img(guard2_element, rhubarb_frame, guard_frame_elements);
+                update_img(guard3_element, rhubarb_frame2, guard_frame_elements);
             } else {
                 stop_animating();
             }
@@ -116,10 +127,13 @@
             animation_handle = 0;
             update_img(face1_element, 0, face_frame_elements);
             update_img(face2_element, 0, face_frame_elements);
+            update_img(face3_element, 0, face_frame_elements);
             update_img(mouth1_element, 0, mouth_frame_elements);
             update_img(mouth2_element, 0, mouth_frame_elements);
+            update_img(mouth3_element, 0, mouth_frame_elements);
             update_img(guard1_element, 0, guard_frame_elements);
             update_img(guard2_element, 0, guard_frame_elements);
+            update_img(guard3_element, 0, guard_frame_elements);
             audio_element.pause();
         }
 
