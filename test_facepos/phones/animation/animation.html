@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<head>
+    <style>
+        table { margin: 0 auto; }
+        img { width: 160px; height: 160px; image-rendering: pixelated; margin: 20px; }
+    </style>
+</head>
+<body>
+    <audio id='mutter' src='x_sg11101a.mp3' preload='auto'></audio>
+    <table>
+        <tr><th>face_process<th>rhubarb
+        <tr><td><img id='face1' src='face0.png' onclick='toggle_animating()'>
+            <td><img id='face2' src='face0.png' onclick='toggle_animating()'>
+        <tr><td><img id='mouth1' src='mouth0.png' onclick='toggle_animating()'>
+            <td><img id='mouth2' src='mouth0.png' onclick='toggle_animating()'>
+        <tr><td><img id='guard1' src='guard0.png' onclick='toggle_animating()'>
+            <td><img id='guard2' src='guard0.png' onclick='toggle_animating()'>
+    </table>
+
+    <div style='opacity: 0.01; height:0px; overflow:hidden;'>
+        <img id='face_frame0' src='face0.png'>
+        <img id='face_frame1' src='face1.png'>
+        <img id='face_frame2' src='face2.png'>
+        <img id='face_frame3' src='face3.png'>
+        <img id='face_frame4' src='face4.png'>
+        <img id='face_frame5' src='face5.png'>
+        <img id='mouth_frame0' src='mouth0.png'>
+        <img id='mouth_frame1' src='mouth1.png'>
+        <img id='mouth_frame2' src='mouth2.png'>
+        <img id='mouth_frame3' src='mouth3.png'>
+        <img id='mouth_frame4' src='mouth4.png'>
+        <img id='mouth_frame5' src='mouth5.png'>
+        <img id='guard_frame0' src='guard0.png'>
+        <img id='guard_frame1' src='guard1.png'>
+        <img id='guard_frame2' src='guard2.png'>
+        <img id='guard_frame3' src='guard3.png'>
+        <img id='guard_frame4' src='guard4.png'>
+        <img id='guard_frame5' src='guard5.png'>
+    </div>
+
+    <script>
+        animating = false;
+        // face_process output:
+        thief_frames =   "12222114222444421121122220442222124111142112222222224221102422122124221121100000141424412222211241211442201000000000214411224112241111211112111121111101111111000000122422122222221112211111221121111111110000";
+        // rhubarb+phones.py output:
+        rhubarb_frames = "2242024422111111111112222231122244422555233333211333333333333244540042233334444422223222222222225003333322200000000022244444022222222040222440033400444444444222220022110044555543322222220002333333322222000000";
+
+        animation_handle = 0;
+        audio_element = document.getElementById('mutter');
+        face1_element = document.getElementById('face1');
+        face2_element = document.getElementById('face2');
+        mouth1_element = document.getElementById('mouth1');
+        mouth2_element = document.getElementById('mouth2');
+        guard1_element = document.getElementById('guard1');
+        guard2_element = document.getElementById('guard2');
+
+        face_frame_elements = [
+            document.getElementById('face_frame0'),
+            document.getElementById('face_frame1'),
+            document.getElementById('face_frame2'),
+            document.getElementById('face_frame3'),
+            document.getElementById('face_frame4'),
+            document.getElementById('face_frame5'),
+            ];
+        mouth_frame_elements = [
+            document.getElementById('mouth_frame0'),
+            document.getElementById('mouth_frame1'),
+            document.getElementById('mouth_frame2'),
+            document.getElementById('mouth_frame3'),
+            document.getElementById('mouth_frame4'),
+            document.getElementById('mouth_frame5'),
+            ];
+        guard_frame_elements = [
+            document.getElementById('guard_frame0'),
+            document.getElementById('guard_frame1'),
+            document.getElementById('guard_frame2'),
+            document.getElementById('guard_frame3'),
+            document.getElementById('guard_frame4'),
+            document.getElementById('guard_frame5'),
+            ];
+
+        function update_img(img_el, frame, frame_els) {
+            img_el.src = frame_els[frame].src;
+        }
+
+        function animate_face(timestamp) {
+            animation_handle = requestAnimationFrame(animate_face)
+
+            var frame_index = Math.floor(audio_element.currentTime * 16.0);
+            // TODO: slight bug here with different length of string.
+            //       ignoring it for now:
+            if (frame_index < thief_frames.length) {
+                var thief_frame = parseInt(thief_frames.charAt(frame_index));
+                var rhubarb_frame = parseInt(rhubarb_frames.charAt(frame_index));
+                update_img(face1_element, thief_frame, face_frame_elements);
+                update_img(face2_element, rhubarb_frame, face_frame_elements);
+                update_img(mouth1_element, thief_frame, mouth_frame_elements);
+                update_img(mouth2_element, rhubarb_frame, mouth_frame_elements);
+                update_img(guard1_element, thief_frame, guard_frame_elements);
+                update_img(guard2_element, rhubarb_frame, guard_frame_elements);
+            } else {
+                stop_animating();
+            }
+        }
+
+        function start_animating() {
+            animating = true;
+            animation_handle = requestAnimationFrame(animate_face);
+            audio_element.currentTime = 0;
+            audio_element.play();
+        }
+
+        function stop_animating() {
+            animating = false;
+            cancelAnimationFrame(animation_handle);
+            animation_handle = 0;
+            update_img(face1_element, 0, face_frame_elements);
+            update_img(face2_element, 0, face_frame_elements);
+            update_img(mouth1_element, 0, mouth_frame_elements);
+            update_img(mouth2_element, 0, mouth_frame_elements);
+            update_img(guard1_element, 0, guard_frame_elements);
+            update_img(guard2_element, 0, guard_frame_elements);
+            audio_element.pause();
+        }
+
+        function toggle_animating() {
+            if (!animating) {
+                start_animating();
+            } else {
+                stop_animating();
+            }
+        }
+    </script>
+</body>
