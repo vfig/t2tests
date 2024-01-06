@@ -4,8 +4,9 @@
 
 schema sg5a0sn			//ASLEEP
 archetype AI_NONE
+delay 3000
 volume -500
-mono_loop 2000 3000
+//mono_loop 2000 3000
 sg5a0sn1 sg5a0sn2 sg5a0sn3 sg5a0sn4 sg5a0sn5 sg5a0sn6
 schema_voice vguard5 1 sleeping
 schema_voice vcop5 1 sleeping
@@ -16,7 +17,7 @@ stream
 delay 5000
 volume -500
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg5a0hu1 sg5a0hu2 sg5a0hu3 sg5a0hu4 sg5a0hu5
 sg5a0mu1 sg5a0mu2 sg5a0mu3 
 sg5a0co1 sg5a0co2 sg5a0co3 sg5a0co4 sg5a0co5 
@@ -29,7 +30,7 @@ stream
 delay 5000
 volume -500
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg5a0wh1 sg5a0wh2 sg5a0wh3 sg5a0wh4 sg5a0wh5
 sg5a0co1 sg5a0co2 sg5a0co3 sg5a0co4 sg5a0co5 
 sg5a0tc1 sg5a0tc2 sg5a0tc3 sg5a0th5
@@ -104,7 +105,7 @@ schema sg5at1			//AT ALERT 1 & 2
 archetype AI_NONE
 volume -500
 delay 5000
-mono_loop 8000 20000
+//mono_loop 8000 20000
 sg5a0co1 sg5a0co2 sg5a0co3 sg5a0co4 sg5a0co5 
 sg5a0th1 sg5a0th2 sg5a0th3 sg5a0th4 
 schema_voice vguard5 1 atlevelone
@@ -114,7 +115,7 @@ schema sg5at1_cop
 archetype AI_NONE
 volume -500
 delay 5000
-mono_loop 8000 20000
+//mono_loop 8000 20000
 sg5a0co1 sg5a0co2 sg5a0co3 sg5a0co4 sg5a0co5 
 sg5a0tc1 sg5a0tc2 sg5a0tc3 sg5a0th5
 schema_voice vcop5 1 atlevelone
@@ -212,7 +213,7 @@ schema sg5at2			//AT ALERT 2 & 3 +Investigating
 archetype AI_MINOR
 delay 4000
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg5a3se1 sg5a3se2 sg5a3se3 sg5a3se4 sg5a3se5 sg5a3se6 sg5a3se7 sg5a3se8
 schema_voice vguard5 99 atleveltwo (Investigate true)
 schema_voice vguard5 99 atlevelthree (Investigate true)

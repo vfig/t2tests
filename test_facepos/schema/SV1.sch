@@ -4,7 +4,8 @@
 schema sv1a0hu
 archetype AI_NONE
 no_repeat
-mono_loop 5000 15000
+delay 3000
+//mono_loop 5000 15000
 volume -500
 sv1a0hu1 sv1a0hu2 sv1a0hu3 sv1a0hu4 sv1a0hu5
 sv1a0co1 sv1a0co2 sv1a0co3 sv1a0co4
@@ -12,7 +13,8 @@ schema_voice vserv1 1 atlevelzero
 
 schema sv1a0wh
 archetype AI_NONE
-mono_loop 5000 15000
+delay 3000
+//mono_loop 5000 15000
 stream
 volume -500
 sv1a0wh1 sv1a0wh2 sv1a0wh3 sv1a0wh4 sv1a0wh5 sv1a0wh6 sv1a0wh7 sv1a0wh8
@@ -20,7 +22,8 @@ schema_voice vserv1 1 atlevelzero
 
 schema sv1a0co
 archetype AI_NONE
-mono_loop 10000 20000
+delay 3000
+//mono_loop 10000 20000
 volume -500
 sv1a0co1 sv1a0co2 sv1a0co3 sv1a0co4
 schema_voice vserv1 1 atlevelzero
@@ -29,7 +32,8 @@ schema_voice vserv1 1 atlevelzero
 //Sleeping
 schema sv1a0sn
 archetype AI_NONE
-mono_loop 1000 2000
+delay 3000
+//mono_loop 1000 2000
 sv1a0sn1 freq 3
 sv1a0sn2 freq 1
 sv1a0sn3 freq 3

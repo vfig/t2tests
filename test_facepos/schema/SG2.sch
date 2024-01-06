@@ -4,8 +4,9 @@
 
 schema sg2a0sn			//ASLEEP
 archetype AI_NONE
+delay 3000
 volume -500
-mono_loop 2000 3000
+//mono_loop 2000 3000
 sg2a0sn1 sg2a0sn2 sg2a0sn3 sg2a0sn4 
 schema_voice vguard2 1 sleeping
 schema_voice vcop2 1 sleeping
@@ -16,7 +17,7 @@ archetype AI_NONE
 delay 2000
 volume -500
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg2a0hu1 sg2a0hu2 sg2a0hu3 sg2a0hu4 sg2a0hu5 sg2a0hu6
 sg2a0mu1 sg2a0mu2 sg2a0mu3 sg2a0mu4
 sg2a0co1 sg2a0co2 sg2a0co3 sg2a0co4 sg2a0co5 sg2a0co6 sg2a0co7 
@@ -28,7 +29,7 @@ delay 2000
 stream
 volume -500
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg2a0wh1 sg2a0wh2 sg2a0wh3 sg2a0wh4
 sg2a0tc1 sg2a0tc2 
 sg2a0th1 sg2a0th2 sg2a0th3 sg2a0th4 sg2a0th5 sg2a0th6
@@ -80,7 +81,7 @@ schema sg2a1tc			//AT ALERT 1 & 2
 archetype AI_NONE
 volume -500
 delay 5000
-mono_loop 8000 20000
+//mono_loop 8000 20000
 sg2a0mu1 sg2a0mu2 sg2a0mu3 sg2a0mu4
 sg2a0co1 sg2a0co2 sg2a0co3 sg2a0co4 sg2a0co5 sg2a0co6 sg2a0co7 
 schema_voice vguard2 1 atlevelone
@@ -90,7 +91,7 @@ schema sg2a1tc_cop
 archetype AI_NONE
 volume -500
 delay 5000
-mono_loop 8000 20000
+//mono_loop 8000 20000
 sg2a0tc1 sg2a0tc2 
 sg2a0th1 sg2a0th2 sg2a0th3 sg2a0th4 sg2a0th5 sg2a0th6
 schema_voice vcop2 1 atlevelone
@@ -169,7 +170,7 @@ schema sg2at2			//AT ALERT 2 & 3 +Investigating
 archetype AI_MINOR
 delay 4000
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg2a3se1 sg2a3se2 sg2a3se3 sg2a3se4 sg2a3se5 sg2a3se6 sg2a3se7 sg2a3se8
 schema_voice vguard2 99 atleveltwo (Investigate true)
 schema_voice vguard2 99 atlevelthree (Investigate true)
@@ -178,7 +179,7 @@ schema sg2at2_cop			//AT ALERT 2 & 3 +Investigating
 archetype AI_MINOR
 delay 4000
 no_repeat
-mono_loop 10000 20000
+//mono_loop 10000 20000
 sg2a3se9 sg2a3sea sg2a3se3 sg2a3se4 sg2a3se5 sg2a3se6 sg2a3se7 sg2a3se8
 schema_voice vcop2 99 atleveltwo (Investigate true)
 schema_voice vcop2 99 atlevelthree (Investigate true)
@@ -528,7 +529,7 @@ archetype AI_NONE
 volume -500
 delay 1000
 no_repeat
-mono_loop 1000 5000
+//mono_loop 1000 5000
 dr1a0hc1 dr1a0hc2 dr1a0hc3 dr1a0hc4
 dr1a0si1 dr1a0si2 dr1a0si3 dr1a0si4 dr1a0si5 dr1a0si6 dr1a0si7 dr1a0si8 dr1a0si9
 schema_voice vdrunk1 1 atlevelzero
@@ -545,7 +546,7 @@ archetype AI_NONE
 volume -500
 delay 2000
 no_repeat
-mono_loop 1000 10000
+//mono_loop 1000 10000
 dr1a0hc1 dr1a0hc2 dr1a0hc3 dr1a0hc4
 schema_voice vdrunk1 1 atleveltwo
 schema_voice vdrunk1 1 atlevelthree
@@ -566,7 +567,7 @@ archetype AI_MINOR
 volume -500
 delay 2000
 no_repeat
-mono_loop 500 10000
+//mono_loop 500 10000
 dr1a0hc1 dr1a0hc2 dr1a0hc3 dr1a0hc4 
 dr1a2__1 dr1a2__2 dr1a2__3 
 dr1a1__2
