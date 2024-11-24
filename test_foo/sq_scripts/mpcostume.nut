@@ -24,15 +24,19 @@ class MPDoll extends SqRootScript {
     function OnFrobInvEnd() {
         // TODO: having this be local-only might fuck its state on save/load?
         //       but: it shouldnt be _storing_ any state!
+        print("---- Change costume ------------------")
         local costume = GetCurrentCostume();
         local index = GetCostumeIndex(costume);
+        print("  current costume:"+costume+" ("+index+")");
         index = (index+1)%MP_AVATAR_COSTUMES.len();
         costume = MP_AVATAR_COSTUMES[index];
+        print("  new costume:"+costume+" ("+index+")");
         ApplyCostume(costume);
     }
 
     function GetCurrentCostume() {
         local costume = SendMessage("Player","MPGetCostume");
+        print("  Player returned: <"+((costume==null)?"null":costume.tostring())+">");
         if (costume==null || costume==0 || costume=="") {
             costume = MP_AVATAR_COSTUMES[0];
             if (Engine.ConfigIsDefined("mp_costume")) {
@@ -42,6 +46,7 @@ class MPDoll extends SqRootScript {
                     print("...default costume from config: "+costume);
                 }
             }
+            print("  defaulting to : <"+costume+">");
         }
         return costume;
     }
@@ -103,15 +108,22 @@ class MPCostumedAvatar extends SqRootScript {
 
     function OnMPGetCostume() {
         print("[:: MPCostumedAvatar "+self+": "+message().message+" ::]");
-        if (IsDataSet("Costume"))
-            return GetData("Costume");
-        return "";
+        if (IsDataSet("Costume")) {
+            local costume = GetData("Costume");
+            print("  on "+self+": costume scriptvar: '"+costume+"'");
+            Reply(GetData("Costume"));
+        } else {
+            print("  on "+self+": costume scriptvar is not set.");
+            Reply(null);
+        }
     }
 
     function OnMPSetCostume() {
         print("[:: MPCostumedAvatar "+self+": "+message().message+"("+message().data+") ::]");
         local costume = message().data.tostring();
         SetData("Costume", costume);
+        print("  on "+self+": set costume scriptvar to <"+costume+">");
+        //local myNum = Networking.MyPlayerNum();
         BroadcastToRemotePlayers("MPRemSetCostume", self, costume);
     }
 
@@ -121,7 +133,7 @@ class MPCostumedAvatar extends SqRootScript {
         local costume = message().data2;
         local fromNum = Networking.ObjToPlayerNum(from);
         if (fromNum!=0) {
-            print("...set ModelName: "+"mpav"+costume);
+            print("...set ModelName on "+from+": "+"mpav"+costume);
             Property.SetSimple(from,"ModelName","mpav"+costume);
         }
     }
