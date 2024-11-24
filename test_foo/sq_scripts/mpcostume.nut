@@ -65,7 +65,11 @@ class MPDoll extends SqRootScript {
     }
 
     function ApplyCostume(costume) {
-        // Change our appearance and tell the player to change too.
+        // Change our name and appearance; tell the player to change too.
+        local arch = Object.Archetype(self);
+        local template = Property.Get(arch, "GameName");
+        local name = format(template, costume);
+        SetProperty("GameName", name);
         SetProperty("ModelName", "mpdo"+costume);
         SendMessage("Player", "MPSetCostume", costume);
     }

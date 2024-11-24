@@ -2,11 +2,11 @@ DML1
 
 #script "squirrel"
 
-CreateArch "MetaProperty" "M-MPCostumedAvatar"
+CreateArch "MetaProperty" "M-MPBlingedAvatar"
 {
     +ObjProp "Scripts"
     {
-        "Script 0" "MPCostumedAvatar"
+        "Script 0" "MPBlingedAvatar"
         "Script 1" ""
         "Script 2" ""
         "Script 3" ""
@@ -14,13 +14,13 @@ CreateArch "MetaProperty" "M-MPCostumedAvatar"
     }
 }
 
-MetaProp "Avatar" "M-MPCostumedAvatar"
-MetaProp "MP Avatar" "M-MPCostumedAvatar"
+MetaProp "Avatar" "M-MPBlingedAvatar"
+MetaProp "MP Avatar" "M-MPBlingedAvatar"
 
-CreateArch "object" "MPDoll"
+CreateArch "object" "MPSetBling"
 {
     // Inventory->Object Name (changed by script)
-    +ObjProp "GameName" = "@Name_MPDoll: "[Costume: %s]""
+    +ObjProp "GameName" = "@Name_MPSetBling: "[Bling: %s]""
 
     // Shape->Model Name (changed by script)
     +ObjProp "ModelName"
@@ -51,11 +51,26 @@ CreateArch "object" "MPDoll"
     // Scripts
     +ObjProp "Scripts"
     {
-        "Script 0" "MPDoll"
+        "Script 0" "MPSetBling"
         "Script 1" ""
         "Script 2" ""
         "Script 3" ""
         "Don't Inherit" FALSE
+    }
+
+    // Networking->Network Category
+    +ObjProp "NetworkCategory"
+    {
+        "" "Local Only"
+    }
+}
+
+CreateArch "object" "MPBling"
+{
+    // Shape->Model Name (changed by script)
+    +ObjProp "ModelName"
+    {
+        "" "waypt"
     }
 
     // Networking->Network Category
