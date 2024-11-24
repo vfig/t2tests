@@ -1,16 +1,10 @@
 DML1
 
-/* The idea here is that we add M-MPChangeAvatar to both the local player
- * object (via "MP Avatar" and "Avatar" archetypes) And then somehow -- yet to be
- * determined -- each multiplayer player defines their model name and notifies the
- * others, and they all change their local remote-player-avatar object for
- * that player to match.
- */
-CreateArch "MetaProperty" "M-MPChangeAvatar"
+CreateArch "MetaProperty" "M-MPCostumedAvatar"
 {
     +ObjProp "Scripts"
     {
-        "Script 0" "MPChangeAvatar"
+        "Script 0" "MPCostumedAvatar"
         "Script 1" ""
         "Script 2" ""
         "Script 3" ""
@@ -18,18 +12,18 @@ CreateArch "MetaProperty" "M-MPChangeAvatar"
     }
 }
 
-MetaProp "Avatar" "M-MPChangeAvatar"
-MetaProp "MP Avatar" "M-MPChangeAvatar"
+MetaProp "Avatar" "M-MPCostumedAvatar"
+MetaProp "MP Avatar" "M-MPCostumedAvatar"
 
 CreateArch "object" "MPDoll"
 {
     // Inventory->Object Name
-    +ObjProp "GameName" = "@Name_MPDoll: "[Change Avatar]""
+    +ObjProp "GameName" = "@Name_MPDoll: "[Change Costume]""
 
-    // Shape->Model Name
+    // Shape->Model Name (changed by script)
     +ObjProp "ModelName"
     {
-        "" "garcrh"
+        "" "playbox"
     }
 
     // Inventory->Can't Drop This
@@ -62,6 +56,7 @@ CreateArch "object" "MPDoll"
         "Don't Inherit" FALSE
     }
 
+    // TODO: is this right?
     // Networking->Network Category
     +ObjProp "NetworkCategory"
     {
