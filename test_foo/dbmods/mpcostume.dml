@@ -1,5 +1,7 @@
 DML1
 
+#script "squirrel"
+
 CreateArch "MetaProperty" "M-MPCostumedAvatar"
 {
     +ObjProp "Scripts"
