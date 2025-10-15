@@ -13,6 +13,11 @@ Note: *** marks values which you will likely want to adjust to tune behaviour.
 Footnote: I use the name "Watson" in this example, because Alexander Graham Bell said "Come here, Watson". That's the joke. It's not much of a joke, really.
 
 
+-----------------------
+REVISION 0 (2025-10-13)
+-----------------------
+
+
 FrobStim setup
 ==============
 
@@ -250,7 +255,7 @@ Searching Behaviour
         - Radius: 8 ***
         - Height: 8 ***
         - Required awareness: (0) None
-        - Line requirement: Line of sight
+        - Line requirement: Line of sight [see REVISION 1 below]
         - Minimum alertness: (0) None
         - Maximum alertness: (1) Low
         - Link kill option: Don't kill
@@ -302,3 +307,26 @@ However it might happen that he gloms onto some other patrol path intended for a
 Finally, you can add other behaviours to these Watson-specific TrolPts if you want, just as you might use TrolPausePts or the various TBP embellishments in a normal guard patrol. As long as such a behaviour will run at alert 2 (but not 3), it should fit in just fine.
 
 --vfig (2025-10-13)
+
+
+-----------------------
+REVISION 1 (2025-10-15)
+-----------------------
+
+
+With Barlowe (but not seen in this example with Watson), often the watch on the summon marker would fail to trigger. There is no detailed debugging for AIWatchObj links, so this is only a best guess supported by testing, but it appears that the line of sight condition is not being met some of the time. My guess is this is due to much faster movement and/or the rather more quadrupedal motion of Barlowe than the human guard.
+
+
+1. Change `ComeHereWatson`:
+
+    a) AI > Utility> Watch: Watch link defaults:
+        - Line requirement: None
+
+
+-----------------------
+REVISION 2 (2025-10-??????????)
+-----------------------
+
+
+use stim trigger for search metaprop pushing (since this is 1.28)
+squirrel-based awareness coolerdowner?
