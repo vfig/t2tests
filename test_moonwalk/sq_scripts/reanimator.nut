@@ -74,3 +74,56 @@ class Reanimator extends SqRootScript
 // }
 
 }
+
+
+class UpsideDownMissJane extends SqRootScript
+{
+
+
+    function OnSim() {
+        if (message().starting) {
+            SetData("Left", 0);
+            AnimateNext();
+        }
+    }
+
+    function AnimateNext() {
+        // Locomote 0:
+        // 211: 260 (+BH111o1o)
+        // 211: 261 (+BH111o11)
+        // 503: 537 (+BH111060)
+        // 503: 538 (+BH111061)
+        local left = (GetData("Left")==1);
+        if (left) {
+            // Switch to right.
+            Puppet.PlayMotion(self, "BH111o11");
+            SetData("Left", 0);
+        } else {
+            // Switch to left.
+            Puppet.PlayMotion(self, "BH111o1o");
+            SetData("Left", 1);
+        }
+    }
+
+    // function OnMotionStart() {
+    //     print(message().message
+    //         +" action:"+message().ActionType
+    //         +" motion:"+message().MotionName
+    //         +" flag:"+message().FlagValue);
+    // }
+
+    function OnMotionEnd() {
+        // print(message().message
+        //     +" action:"+message().ActionType
+        //     +" motion:"+message().MotionName
+        //     +" flag:"+message().FlagValue);
+        AnimateNext();
+    }
+
+    // function OnMotionFlagReached() {
+    //     print(message().message
+    //         +" action:"+message().ActionType
+    //         +" motion:"+message().MotionName
+    //         +" flag:"+message().FlagValue);
+    // }
+}

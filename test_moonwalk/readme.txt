@@ -12,3 +12,13 @@ APPROACH 2: a fucking stupid idea, but can we use Time Warp and Puppet to play a
 
 
 RESULT: abandoned the initial question, and instead used the puppet approach to play to a random point in the motion every frame, for a wildly flickering, sort of Cradle-puppet turned up to 11 result. and changed the DetailAttach so the puppet is upside down for good measure. this could actually be an interesting horror mission ai, honestly?
+
+
+
+---------------
+
+
+ALSO: quick hack of using puppet + elevator to fake an ai who walks on the ceiling! if you tracked which TerrPts the elevator was at, and also added in more motions you could play, you could totally fake an AI turning or whatever, and have a much more convincing result!
+
+BONUS: because i *dont* have the ai turning around, i actually *do* get him moonwalking like this project name, which is funnier because the original thing i wanted to try *wasnt* actually going to be moonwalking!
+
