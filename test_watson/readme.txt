@@ -323,10 +323,18 @@ With Barlowe (but not seen in this example with Watson), often the watch on the 
         - Line requirement: None
 
 
------------------------
-REVISION 2 (2025-10-??????????)
------------------------
+Footnote: I considered changing to use a stim instead of AIWatchObj to add M-WatsonSearching, but the crucial problem there is we can't prevent it being added when Watson is in high alert! So he would end up trying to do combat with 'Search 0' motion tags, which is not good at all (and in fact is why i switched to using AIWatchObj; my first rough version did use a stim here!).
 
 
-use stim trigger for search metaprop pushing (since this is 1.28)
-squirrel-based awareness coolerdowner?
+-----------------------
+REVISION 2 (2025-10-18)
+-----------------------
+
+Add distance-based flee cancellation and healing for Watson.
+
+
+-----------------------
+REVISION 4 (2025-10-18)
+-----------------------
+
+Add Investigation/L3 alert/L2 alert cooldown script (prevents Watson getting stuck in L3 alert for two minutes if he hears a broadhead on metal, for example).
