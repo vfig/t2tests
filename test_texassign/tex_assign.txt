@@ -1,0 +1,15 @@
+# I am a comment.
+; I am also a comment.
+// Also i am a comment. ignore all of us.
+
+MetalTex:
+    tower2\FLEDGE.pcx
+    tower2/GIRD
+
+MetalGridTex:
+    mech/GRATMOLD
+    mech/JAILDOOR.dds
+
+MechTex:
+
+// the end.
