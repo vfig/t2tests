@@ -15,7 +15,8 @@ class BaseCrowJoints extends SqRootScript
         // (These are all for my testing, feel free to change/delete them:)
         look_lefteye    = [ -15.0,   0.00,   0.00,  -30.00,  0.05,  -70.00 ],
         curious1        = [  10.0,   0.00,   0.00,  -47.86, -0.014,  12.87 ],
-        weird           = [   0.0, -19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
+        left_turn       = [-4.04846, 25.9793, -20.6067, -4.10156, 0.0996216, 69.0387],
+        weird           = [  20,     19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
     };
 
     function AnimateToRandomPresetPose() {
