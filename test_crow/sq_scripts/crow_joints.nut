@@ -1,28 +1,23 @@
 class BaseCrowJoints extends SqRootScript
 {
-    static MAX_JOINT = 5;
+    static MAX_JOINT = 5; // Joint 6 is not used at this time.
 
     static POSES = {
-        // POSE              legs, shoulder, neck, stretch, head
-        reset           = [   0.00,   0.00,    0.00,  0.00,    0.00 ],
-        look_lefteye    = [   0.00,   0.00,  -30.00,  0.05,  -70.00 ],
-        curious1        = [   0.00,   0.00,  -47.86, -0.014,  -8.87 ],
-        luckydip        = [  20.00,  30.00,   60.00,  0.1,    70.00 ],
-        weird           = [ -19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
+        // Neutral pose:
+        reset           = [   0.0,   0.00,   0.00,    0.00,  0.00,    0.00 ],
 
-        // blink     = [ 20.00,  20.00, 999.99, 999.99], // ignore eye.x and eye.y
-        // ahead     = [-25.71,  34.29,   0.34,  -5.71],
-        // left      = [-15.53,  44.47, -26.88,   4.47],
-        // right     = [-23.18,  36.82,  26.92,  -3.18],
-        // upleft    = [-43.82,  16.18,  -9.00, -23.82],
-        // upright   = [-43.73,  16.27,  19.08, -23.73],
-        // downleft  = [ -7.45,  50.00,  -8.82,  12.55],
-        // downright = [  3.91,  50.00,  20.52,  23.91],
-        // TODO: up, down
+        // Min/max rotation/joint values:
+        range_min       = [ -40.0, -30.00, -30.00,  -60.00, -0.1,   -70.00 ],
+        range_max       = [  40.0,  20.00,  30.00,   60.00,  0.1,    70.00 ],
+
+        // Preset poses:
+        // POSE             rotate,  legs, shoulder, neck, stretch,  head
+        look_lefteye    = [ -15.0,   0.00,   0.00,  -30.00,  0.05,  -70.00 ],
+        curious1        = [  10.0,   0.00,   0.00,  -47.86, -0.014,  12.87 ],
+        weird           = [   0.0, -19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
     };
 
-    function AnimateToRandomPose() {
-        print("AnimateToRandomPose")
+    function AnimateToRandomPresetPose() {
         local choice = rand() % POSES.len();
         local i = 0;
         foreach (k,_ in POSES) {
@@ -35,51 +30,82 @@ class BaseCrowJoints extends SqRootScript
     }
 
     function AnimateToPose(poseName) {
-        print("AnimateToPose("+poseName+")");
-        local pose = POSES[poseName];
-        if (poseName=="luckydip") {
-            pose = clone pose;
+        local pose;
+        if (poseName=="random") {
+            pose = clone POSES.reset;
             for (local i=0; i<pose.len(); ++i) {
-                pose[i] *= Data.RandFltNeg1to1();
+                local f = Data.RandFlt0to1();
+                local fmin = POSES.range_min[i];
+                local fmax = POSES.range_max[i];
+                pose[i] = f*(fmax-fmin)+fmin;
             }
+        } else {
+            pose = clone POSES[poseName]
         }
         _AnimateJointsToPose(pose);
     }
 
     function _AnimateJointsToPose(pose) {
-        // pose is an array: [neck_rotation, neck_stretch, head_rotation].
+        // pose is an array: [z_rotation, legs_pitch, shoulder_pitch, neck_rotation, neck_stretch, head_rotation].
         //
         // NOTE: Tweqs do not send TweqCompleted if they don't run at all (such as
         // if they're already at the target position), nor when the primary
         // joint has rate 0 (even if other joints should move). So we take
         // those things into account below; and we use our own PoseCompleted
         // message instead of relying on TweqCompleted.
-        print("POSE: ["+pose[0]+", "+pose[1]+", "+pose[2]+", "+pose[3]+", "+pose[4]+"]");
+        print("Crow "+self+" pose is: ["+pose[0]+", "+pose[1]+", "+pose[2]+", "+pose[3]+", "+pose[4]+", "+pose[5]+"]");
 
-        local head_speed = 800; // degrees/second
-        local body_speed = 400; // degrees/second
-        local rate = [0,0,0,0,0,0];
-        local lo = [0,0,0,0,0,0];
-        local hi = [0,0,0,0,0,0];
+        local rotate_speed = 300; // degrees/second
+        local head_speed = 800;   //   ditto
+        local body_speed = 300;   //   ditto
+        local rate = [0,0,0,0,0,0,0]; // 0: z-rotation, 1-6: joints
+        local lo = [0,0,0,0,0,0,0];   //   ditto
+        local hi = [0,0,0,0,0,0,0];   //   ditto
         // Assign low and high tweq values.
-        for (local j=0; j<MAX_JOINT; ++j) {
+        for (local j=0; j<=MAX_JOINT; ++j) {
             local target = pose[j];
-            local value = GetProperty("JointPos", JOINT_POS_FIELD[j]);
+            local value;
+            switch (j) {
+            case 0:
+                value = Object.Facing(self).z;
+                // TweqRotate cant handle -X to +X rotation, so we shove
+                // the target into the other half of the circle.
+                target += 180.0; if (target>360.0) target -= 360.0;
+                break;
+            default:
+                value = GetProperty("JointPos", JOINT_POS_FIELD[j-1]);
+                break;
+            }
             lo[j] = (target<value) ? target : value;
             hi[j] = (target>value) ? target : value;
             rate[j] = (target>value) ? 1.0 : -1.0;
         }
         // Adjust rates so all joints complete ~simultaneously.
         local max_distance = 0.001;
-        for (local j=0; j<MAX_JOINT; ++j) {
+        local max_is_rotate = false;
+        for (local j=0; j<=MAX_JOINT; ++j) {
             local dist = fabs(hi[j]-lo[j]);
-            if (dist>max_distance) max_distance = dist;
+            if (dist>max_distance) {
+                max_distance = dist;
+                max_is_rotate = (j==0);
+            }
         }
         local should_run_tweqs = false;
-        for (local j=0; j<MAX_JOINT; ++j) {
+        for (local j=0; j<=MAX_JOINT; ++j) {
             local dist = fabs(hi[j]-lo[j]);
-            local turn_rate = (j==0? body_speed : head_speed)/10.0;
-            rate[j] *= turn_rate*dist/max_distance;
+            local turn_rate;
+            switch (j) {
+            case 0:
+                turn_rate = rotate_speed;
+                break;
+            case 1:
+                turn_rate = body_speed;
+                break;
+            default:
+                turn_rate = head_speed;
+                break;
+            }
+            rate[j] *= 0.1*turn_rate*dist/max_distance;
             if (fabs(rate[j])>0.01) should_run_tweqs = true;
         }
         // If no joints will animate, then we're done.
@@ -88,29 +114,47 @@ class BaseCrowJoints extends SqRootScript
             return;
         }
         // Update the properties (for all joints).
-        for (local j=0; j<MAX_JOINT; ++j) {
+        for (local j=0; j<=MAX_JOINT; ++j) {
             if (fabs(rate[j])>0.01) {
-                SetProperty("CfgTweqJoints", JOINT_ANIM_FIELD[j],
-                    TWEQ_AC_SIM);
-                SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j],
-                    vector(rate[j],lo[j],hi[j]));
-                SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j],
-                    TWEQ_AS_ONOFF);
+                switch (j) {
+                case 0:
+                    SetProperty("CfgTweqRotate", "z rate-low-high",
+                        vector(rate[j],lo[j],hi[j]));
+                    break;
+                default:
+                    SetProperty("CfgTweqJoints", JOINT_ANIM_FIELD[j-1],
+                        TWEQ_AC_SIM);
+                    SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j-1],
+                        vector(rate[j],lo[j],hi[j]));
+                    SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j-1],
+                        TWEQ_AS_ONOFF);
+                    break;
+                }
+
             }
         }
+        SetProperty("StTweqRotate", "AnimS", 0);
+        SetProperty("CfgTweqRotate", "MiscC", (max_is_rotate? TWEQ_MC_SCRIPTS : 0));
+        SetProperty("CfgTweqRotate", "AnimC", TWEQ_AC_SIM);
+        SetProperty("CfgTweqRotate", "Primary Axis", 3);
+        SetProperty("StTweqRotate", "AnimS", TWEQ_AS_ONOFF);
 
-        SetProperty("CfgTweqJoints", "MiscC", TWEQ_MC_SCRIPTS);
+        SetProperty("StTweqJoints", "AnimS", 0);
+        SetProperty("CfgTweqJoints", "MiscC", (max_is_rotate? 0 : TWEQ_MC_SCRIPTS));
         SetProperty("CfgTweqJoints", "AnimC", TWEQ_AC_SIM);
         SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
-
-        //TODO: remove
-        // print("----- TO -----");
-        // dump_joints();
     }
 
     function OnTweqComplete() {
-        print(message().message);
-        if (message().Type==eTweqType.kTweqTypeJoints) {
+        // NOTE: We seem to be getting TweqComplete messages even when the
+        //       Scripts flag is off. So we double check the flag here to know
+        //       if the slowest thing (rotation or joints) is the one notifying
+        //       us.
+        local wasRotate = ( message().Type==eTweqType.kTweqTypeRotate
+            && (GetProperty("CfgTweqRotate", "MiscC")&TWEQ_MC_SCRIPTS) );
+        local wasJoints = ( message().Type==eTweqType.kTweqTypeJoints
+            && (GetProperty("CfgTweqJoints", "MiscC")&TWEQ_MC_SCRIPTS) );
+        if (wasJoints || wasRotate) {
             SendMessage(self, "PoseCompleted");
         }
     }
@@ -135,7 +179,7 @@ class BaseCrowJoints extends SqRootScript
     function dump_joints() {
         local anims = GetProperty("StTweqJoints", "AnimS");
         print("AnimS: "+anims);
-        for (local j=0; j<MAX_JOINT; ++j) {
+        for (local j=0; j<=MAX_JOINT; ++j) {
             print("Joint "+j+":")
             local range = GetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j]);
             local anims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
@@ -151,13 +195,13 @@ class CrowJointsTest extends BaseCrowJoints
 {
     function OnTurnOn() {
         local poseName = Property.Get(message().from, "DesignNote");
-        if (!(poseName in POSES) && poseName!="random") {
+        if (!(poseName in POSES) && poseName!="random" && poseName!="randomPreset") {
             print("ERROR: unknown pose '"+poseName+"'");
             return;
         }
         print("");
         print("SET POSE: " + poseName);
-        if (poseName=="random") {
+        if (poseName=="randomPreset") {
             AnimateToRandomPose();
         } else {
             AnimateToPose(poseName);
@@ -192,118 +236,52 @@ class CrowJointsTest extends BaseCrowJoints
    }
 }
 
-/*
-class DualCompassInventory extends DualCompass
+class CrowJointsRandom extends BaseCrowJoints
 {
-    // Inventory
-
     function OnSim() {
-        print(message().message);
-        SetData("DualCompassAnimating", false);
+        if (message().starting) {
+            SendMessage(self, "TurnOn");
+        }
     }
 
-    function OnInvSelect() {
-        print(message().message);
-        SetData("DualCompassAnimating", true);
-        SetOneShotTimer("AnimateAgain", 3.0);
+    function OnTurnOn() {
+        if (! IsDataSet("Active")) {
+            SetData("Active", TRUE);
+            AnimateToPose("random");
+        }
     }
 
-    function OnInvDeSelect() {
-        print(message().message);
-        SetData("DualCompassAnimating", false);
+    function OnTurnOff() {
+        ClearData("Active");
+        if (IsDataSet("Timer")) {
+            KillTimer(GetData("Timer"));
+            ClearData("Timer");
+        }
         AnimateToPose("reset");
     }
 
     function OnPoseCompleted() {
-        print(message().message);
-        local keepAnimating = GetData("DualCompassAnimating");
-        if (keepAnimating) {
-            local r = (rand().tofloat()/RAND_MAX);
-            local delay = 1.0+2.5*r;
-            SetOneShotTimer("AnimateAgain", delay);
+        if (IsDataSet("Active")) {
+            StartTimer();
         }
+    }
+
+    function StartTimer() {
+        local median = 2500;
+        if (HasProperty("ScriptTiming")) {
+            median = GetProperty("ScriptTiming");
+        }
+        local delay = median*(0.5 + Data.RandFlt0to1());
+        if (IsDataSet("Timer")) print("BAD STATE, TIMER ALREADY SET!");
+        SetData("Timer", SetOneShotTimer("Animate", 0.001*delay));
     }
 
     function OnTimer() {
-        print(message().message);
-        if (message().name=="AnimateAgain") {
-            local keepAnimating = GetData("DualCompassAnimating");
-            if (keepAnimating) AnimateToRandomPose();
+        if (message().name=="Animate") {
+            ClearData("Timer");
+            if (IsDataSet("Active")) {
+                AnimateToPose("random");
+            }
         }
     }
 }
-
-class DualCompassInventoryStaring extends DualCompass
-{
-    // Inventory
-
-    function OnSim() {
-        print(message().message);
-        SetData("DualCompassAnimating", false);
-    }
-
-    function OnInvSelect() {
-        print(message().message);
-        SetData("DualCompassAnimating", true);
-        PostMessage(self, "AnimateCompassFrame");
-    }
-
-    function OnInvDeSelect() {
-        print(message().message);
-        SetData("DualCompassAnimating", false);
-        AnimateToPose("reset");
-    }
-
-    function OnAnimateCompassFrame() {
-        local keepAnimating = GetData("DualCompassAnimating");
-        if (! keepAnimating) return;
-
-        local t = (GetTime()*-8.4375*10)%360.0;
-        local t2 = (GetTime()*2000.0)%360.0;
-        local fac = Object.Facing(self);
-        local camfac = Camera.GetFacing();
-
-        if (camfac.y>180.0) camfac.y-=360.0;
-        // This is the compass2 angle calculation from drkinvui.
-        local pitch_factor = 0.25*camfac.y;
-        if (pitch_factor < -5.625)
-           pitch_factor=((pitch_factor+5.625)*5)+(-5.625);
-        else if (pitch_factor < -8.4375)
-           pitch_factor=((pitch_factor+8.4375)*2)+(-19.6875);
-        else if (pitch_factor > 5.625)
-           pitch_factor=((pitch_factor-5.625)*2)+(5.625);
-        local camy = -25.3125 - pitch_factor;
-
-    if(0) {
-        // Joint 1: compensate for compass z rotation
-        SetProperty("JointPos", "Joint 1", (fac.z+270.0)%360.0);
-        // Joint 2: compensate for compass y rotation
-        SetProperty("JointPos", "Joint 2", (camy+360.0+20.0)%360.0);
-    }
-
-        // left/right: -27 to 27?
-        // up/down: -24 to 24?
-
-        // OKAY, this approach works (i havent figured out x yet tho),
-        // BUT: there is _definitely_ not enough movement on y axis to
-        // allow the compass eye to look at the player directly, unless
-        // the player is staring *way* down at the ground. this needs
-        // model reworking to fix!
-
-        local eyeX = 0.0; // ((fac.z+270.0)%360.0);
-        local eyeY = ((camy+360.0+20.0+70.0)%360.0);
-        // the eye needs to clamp -- but disable for now, because it
-        // is both insufficient (doesnt account for reduced pitch range
-        // when looking to the sides) and interferes with seeing how
-        // the pitch adjustment is working:
-        // if (eyeY < -27.0) eyeY = -27.0;
-        // if (eyeY > 27.0) eyeY = 27.0;
-        local angles = [-50.00, 50.00, eyeX, eyeY];
-        for (local j=0; j<4; ++j) {
-            SetProperty("JointPos", JOINT_POS_FIELD[j], angles[j]);
-        }
-
-        PostMessage(self, "AnimateCompassFrame");
-    }
-}
-*/
