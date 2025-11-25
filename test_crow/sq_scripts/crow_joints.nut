@@ -1,17 +1,18 @@
 class BaseCrowJoints extends SqRootScript
 {
-    static MAX_JOINT = 5; // Joint 6 is not used at this time.
+    static MAX_JOINT = 6;
 
     static POSES = {
         // Neutral pose:
         reset           = [   0.0,   0.00,   0.00,    0.00,  0.00,    0.00 ],
 
         // Min/max rotation/joint values:
-        range_min       = [ -40.0, -30.00, -30.00,  -60.00, -0.1,   -70.00 ],
-        range_max       = [  40.0,  20.00,  30.00,   60.00,  0.1,    70.00 ],
+        range_min       = [ -20.0, -20.00, -30.00,  -60.00, -0.1,   -70.00 ],
+        range_max       = [  30.0,  30.00,  30.00,   60.00,  0.1,    70.00 ],
 
         // Preset poses:
-        // POSE             rotate,  legs, shoulder, neck, stretch,  head
+        // POSE              hipr,  hipl, shoulder, neck, stretch,  head
+        // (These are all for my testing, feel free to change/delete them:)
         look_lefteye    = [ -15.0,   0.00,   0.00,  -30.00,  0.05,  -70.00 ],
         curious1        = [  10.0,   0.00,   0.00,  -47.86, -0.014,  12.87 ],
         weird           = [   0.0, -19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
@@ -46,7 +47,7 @@ class BaseCrowJoints extends SqRootScript
     }
 
     function _AnimateJointsToPose(pose) {
-        // pose is an array: [z_rotation, legs_pitch, shoulder_pitch, neck_rotation, neck_stretch, head_rotation].
+        // pose is an array: [hip_right, hip_left, shoulder_pitch, neck_rotation, neck_stretch, head_rotation].
         //
         // NOTE: Tweqs do not send TweqCompleted if they don't run at all (such as
         // if they're already at the target position), nor when the primary
@@ -55,49 +56,33 @@ class BaseCrowJoints extends SqRootScript
         // message instead of relying on TweqCompleted.
         print("Crow "+self+" pose is: ["+pose[0]+", "+pose[1]+", "+pose[2]+", "+pose[3]+", "+pose[4]+", "+pose[5]+"]");
 
-        local rotate_speed = 300; // degrees/second
-        local head_speed = 800;   //   ditto
+        local head_speed = 800; // degrees/second
         local body_speed = 300;   //   ditto
-        local rate = [0,0,0,0,0,0,0]; // 0: z-rotation, 1-6: joints
-        local lo = [0,0,0,0,0,0,0];   //   ditto
-        local hi = [0,0,0,0,0,0,0];   //   ditto
+        local rate = [0,0,0,0,0,0]; // 0-5: joints
+        local lo = [0,0,0,0,0,0];   //   ditto
+        local hi = [0,0,0,0,0,0];   //   ditto
         // Assign low and high tweq values.
-        for (local j=0; j<=MAX_JOINT; ++j) {
+        for (local j=0; j<MAX_JOINT; ++j) {
             local target = pose[j];
-            local value;
-            switch (j) {
-            case 0:
-                value = Object.Facing(self).z;
-                // TweqRotate cant handle -X to +X rotation, so we shove
-                // the target into the other half of the circle.
-                target += 180.0; if (target>360.0) target -= 360.0;
-                break;
-            default:
-                value = GetProperty("JointPos", JOINT_POS_FIELD[j-1]);
-                break;
-            }
+            local value = GetProperty("JointPos", JOINT_POS_FIELD[j]);
             lo[j] = (target<value) ? target : value;
             hi[j] = (target>value) ? target : value;
             rate[j] = (target>value) ? 1.0 : -1.0;
         }
         // Adjust rates so all joints complete ~simultaneously.
         local max_distance = 0.001;
-        local max_is_rotate = false;
-        for (local j=0; j<=MAX_JOINT; ++j) {
+        for (local j=0; j<MAX_JOINT; ++j) {
             local dist = fabs(hi[j]-lo[j]);
             if (dist>max_distance) {
                 max_distance = dist;
-                max_is_rotate = (j==0);
             }
         }
         local should_run_tweqs = false;
-        for (local j=0; j<=MAX_JOINT; ++j) {
+        for (local j=0; j<MAX_JOINT; ++j) {
             local dist = fabs(hi[j]-lo[j]);
             local turn_rate;
             switch (j) {
             case 0:
-                turn_rate = rotate_speed;
-                break;
             case 1:
                 turn_rate = body_speed;
                 break;
@@ -114,47 +99,24 @@ class BaseCrowJoints extends SqRootScript
             return;
         }
         // Update the properties (for all joints).
-        for (local j=0; j<=MAX_JOINT; ++j) {
+        for (local j=0; j<MAX_JOINT; ++j) {
             if (fabs(rate[j])>0.01) {
-                switch (j) {
-                case 0:
-                    SetProperty("CfgTweqRotate", "z rate-low-high",
-                        vector(rate[j],lo[j],hi[j]));
-                    break;
-                default:
-                    SetProperty("CfgTweqJoints", JOINT_ANIM_FIELD[j-1],
-                        TWEQ_AC_SIM);
-                    SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j-1],
-                        vector(rate[j],lo[j],hi[j]));
-                    SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j-1],
-                        TWEQ_AS_ONOFF);
-                    break;
-                }
-
+                SetProperty("CfgTweqJoints", JOINT_ANIM_FIELD[j],
+                    TWEQ_AC_SIM);
+                SetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j],
+                    vector(rate[j],lo[j],hi[j]));
+                SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j],
+                    TWEQ_AS_ONOFF);
             }
         }
-        SetProperty("StTweqRotate", "AnimS", 0);
-        SetProperty("CfgTweqRotate", "MiscC", (max_is_rotate? TWEQ_MC_SCRIPTS : 0));
-        SetProperty("CfgTweqRotate", "AnimC", TWEQ_AC_SIM);
-        SetProperty("CfgTweqRotate", "Primary Axis", 3);
-        SetProperty("StTweqRotate", "AnimS", TWEQ_AS_ONOFF);
-
         SetProperty("StTweqJoints", "AnimS", 0);
-        SetProperty("CfgTweqJoints", "MiscC", (max_is_rotate? 0 : TWEQ_MC_SCRIPTS));
+        SetProperty("CfgTweqJoints", "MiscC", TWEQ_MC_SCRIPTS);
         SetProperty("CfgTweqJoints", "AnimC", TWEQ_AC_SIM);
         SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
     }
 
     function OnTweqComplete() {
-        // NOTE: We seem to be getting TweqComplete messages even when the
-        //       Scripts flag is off. So we double check the flag here to know
-        //       if the slowest thing (rotation or joints) is the one notifying
-        //       us.
-        local wasRotate = ( message().Type==eTweqType.kTweqTypeRotate
-            && (GetProperty("CfgTweqRotate", "MiscC")&TWEQ_MC_SCRIPTS) );
-        local wasJoints = ( message().Type==eTweqType.kTweqTypeJoints
-            && (GetProperty("CfgTweqJoints", "MiscC")&TWEQ_MC_SCRIPTS) );
-        if (wasJoints || wasRotate) {
+        if (message().Type==eTweqType.kTweqTypeJoints) {
             SendMessage(self, "PoseCompleted");
         }
     }
@@ -179,7 +141,7 @@ class BaseCrowJoints extends SqRootScript
     function dump_joints() {
         local anims = GetProperty("StTweqJoints", "AnimS");
         print("AnimS: "+anims);
-        for (local j=0; j<=MAX_JOINT; ++j) {
+        for (local j=0; j<MAX_JOINT; ++j) {
             print("Joint "+j+":")
             local range = GetProperty("CfgTweqJoints", JOINT_RANGE_FIELD[j]);
             local anims = GetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j]);
