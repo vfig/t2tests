@@ -113,23 +113,32 @@ MOTIONS <- {
             "Locomote 0, Player 0, Crouching 0",    // Walk forward, crouched
             "Locomote 0, Player 0, Climbing 0",     // Climb ladder (left and right hands)
             "Stand 0, Player 0, Crouching 0",       // Drop down from ladder.
+            "Jumping 0, Player 0, Direction 3", //plyjmpfw
+            "Jumping 0, Player 0, Direction 4", //plyjmpbk
+            "Jumping 0, LocoUrgent 0, Player 0, Direction 3", //plyrjmpf
+            "Jumping 0, Player 0", //plyjumpup1
+            "Mantle 0, Player 0", //plymant
         ]},
     ],
 
-    /*
-    // TODO: fix these (some have multiple directions) and organise them?
-    UNORGANISED=[
-        {name="Jumping", tags=[
-            "Jumping 0", // garret
-            "Jumping 0, LocoUrgent 0<i>, Direction &lt;&gt;</i>", // garret
-        ]},
+    STOCK2=[
         {name="Walking", tags=[
-            "Locomote 0<i>, Direction &lt;1-4&gt;</i>", // walk
-            "Locomote 0, LocoUrgent 0<i>, Direction &lt;1-4&gt;</i>", // run
+            "Locomote 0, Direction 1", // walk
+            "Locomote 0, Direction 2", // walk
+            "Locomote 0, Direction 3", // walk
+            "Locomote 0, Direction 4", // walk
+            "Locomote 0, Direction 8", // walk
+            "Locomote 0, OnStairs 0", // walk
+            "Locomote 0, OnStairs 1", // walk
+            "Locomote 0, LocoUrgent 0, Direction 1", // run
+            "Locomote 0, LocoUrgent 0, Direction 2", // run
+            "Locomote 0, LocoUrgent 0, Direction 4", // run
+            "Locomote 0, LocoUrgent 0, WithTurns 0", // run
             "Locomote 0, Search 0", // walk holding out weapon
             "Locomote 0, Climbing 0", // garret
             "Locomote 0, Crouching 0", // garret
         ]},
+/*
         {name="Dying", tags=[
             "Crumple 0, Knockout 0", // on back
             "Crumple 0, Die 0<i>, Direction &lt;1-4&gt;</i>", // on front
@@ -166,8 +175,8 @@ MOTIONS <- {
             "MeleeCombat 0, Attack 0, Direction &lt;0,5,6&gt;", // swing sword
             "MeleeCombat 0, Attack 0, SpecialAttack 0", // two-handed overhead bash
         ]},
-    ],
     */
+    ],
 
     /* Additional motions from Shadowspawn's GMDB: */
     GMDB=[

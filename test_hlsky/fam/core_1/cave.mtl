@@ -5,7 +5,7 @@ render_pass
     uv_source PROJECTION
 
     ;; This makes the skybox spin around a vertical axis:
-    uv_mod SPIN 5.0
+    ;uv_mod SPIN 5.0
 
     ;; This makes the skybox rotate back and forth, around a vertical axis:
     ;uv_mod ROTATE_WAVE SINE 0 10 0 1000 

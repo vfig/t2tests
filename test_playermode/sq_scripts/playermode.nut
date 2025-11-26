@@ -86,6 +86,11 @@ class TestPlayerMode extends SqRootScript
         // playermode doesnt use that, but directly gets the dynamics and calls its method.
         // DOESNT WORK: local controls = Property.Get(player, "PhysControl", "Controls Active");
         // DOESNT WORK: Property.Set(player, "PhysControl", "Controls Active", 0x10);
+
+        // Surely death can't fuck with our physics model IF WE HAVE NO PHYSICS MODEL??
+        // I mean, yes, but also IT ALL GOES VERY WEIRD AND WRONG. and crashes sometimes.
+        // USELESS: Property.Set(player, "PhysType", "Type", 3); // None
+
         DarkGame.PlayerMode(ePlayerMode.kPM_Dead);
         // DOESNT WORK: Property.Set(player, "PhysControl", "Controls Active", controls);
 
