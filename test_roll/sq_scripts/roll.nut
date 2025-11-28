@@ -187,28 +187,29 @@ class RollStuntDouble extends SqRootScript
         // TODO: unphysicalise the player (can we?) and DetailAttach them to
         //       the stunt double too.
         local spinner = Object.Create("fnord");
-        Property.SetSimple(spinner, "ModelName", "swchwhe"); // has rotary joint
+        Property.SetSimple(spinner, "ModelName", "axisjoints"); // has rotary joint
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(spinner, "RenderType", 0); // Normal
         Object.Teleport(spinner, vector(), vector(), self);
         local link = Link.Create("DetailAttachement", spinner, self);
+        LinkTools.LinkSetData(link, "rel pos", vector());
         LinkTools.LinkSetData(link, "rel rot", vector());
         Property.Add(spinner, "CfgTweqJoints");
         if (DEBUG_NODESTROY)
-            Property.Set(spinner, "CfgTweqJoints", "Halt", TWEQ_HALT_STOP);
+            Property.Set(spinner, "CfgTweqJoints", "Halt", TWEQ_STATUS_QUO);
         else
             Property.Set(spinner, "CfgTweqJoints", "Halt", TWEQ_HALT_SLAY);
         Property.Set(spinner, "CfgTweqJoints", "AnimC", TWEQ_AC_SIM);
         Property.Set(spinner, "CfgTweqJoints", "MiscC", 0);
         Property.Set(spinner, "CfgTweqJoints", "CurveC" 0);
-        Property.Set(spinner, "CfgTweqJoints", "Primary Joint", 1);
-        Property.Set(spinner, "CfgTweqJoints", "Joint1AnimC", TWEQ_AC_SIM);
-        Property.Set(spinner, "CfgTweqJoints", "Joint1CurveC", 0);
-        Property.Set(spinner, "CfgTweqJoints", "    rate-low-high", vector(40.0,0,360));
+        Property.Set(spinner, "CfgTweqJoints", "Primary Joint", 2);
+        Property.Set(spinner, "CfgTweqJoints", "Joint2AnimC", TWEQ_AC_SIM);
+        Property.Set(spinner, "CfgTweqJoints", "Joint2CurveC", 0);
+        Property.Set(spinner, "CfgTweqJoints", "    rate-low-high2", vector(40.0,0,360));
         Property.Set(spinner, "StTweqJoints", "MiscS", 0);
         if (! DEBUG_NOROLL) {
             Property.Set(spinner, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
-            Property.Set(spinner, "StTweqJoints", "Joint1AnimS", TWEQ_AS_ONOFF);
+            Property.Set(spinner, "StTweqJoints", "Joint2AnimS", TWEQ_AS_ONOFF);
         }
         Property.Set(spinner, "Scripts", "Script 0", "RollSpinner");
         
@@ -218,13 +219,11 @@ class RollStuntDouble extends SqRootScript
             Property.SetSimple(anchor, "RenderType", 0); // Normal
         Object.Teleport(anchor, vector(), vector(), self);
         link = Link.Create("DetailAttachement", anchor, spinner);
-        LinkTools.LinkSetData(link, "vhot/sub #", 1);
+        LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
-        LinkTools.LinkSetData(link, "rel rot", vector(180,0,90));
-        // TODO: offset for head location?
-        // TODO: this x offset is a hack for the swchwhe, maybe make custom axisy thing?
-        // TODO: this z offset is just me throwing numbers, its not quite the cam offset
-        LinkTools.LinkSetData(link, "rel pos", vector(0.7,0,-1));
+        // TODO: offset for head location? this z offset is just me throwing numbers, its not quite the cam offset
+        LinkTools.LinkSetData(link, "rel pos", vector(0,0,1.25));
+        LinkTools.LinkSetData(link, "rel rot", vector());
 
         link = Link.Create("ScriptParams", self, anchor);
         LinkTools.LinkSetData(link, "", "StuntDouble");
