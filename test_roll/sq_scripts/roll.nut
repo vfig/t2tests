@@ -1,3 +1,21 @@
+// TODO: PROBLEMS
+//    - cant reliably detect if standing on OBB/Sphere/Sphere Hat object [for crouch override]
+//    - cant detach from ladders/ropes [for crouch override]
+//    - cant handle "hold crouch" variant [for crouch override]
+//    - cant detect key _held_ properly (just get repeat pings)
+//          - _could_ have script that adds metaprop to player if not present,
+//            or pings player to postpone removal of metaprop if present; but
+//            the delay and repeat rate is likely from the user's settings in the os??
+
+// TODO:
+//    - all the TODOs below.
+//    - damage reduction calculation not yet implemented
+//    - could have a roll button that can be used obviously when landing,
+//      but also when running/sprinting?
+//    - could maybe have a sprint button?? with stamina ofc to prevent too much
+//      abuse; would it be a hold or a toggle?
+//    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
+
 class CmdCrouchRoll extends SqRootScript
 {
     function OnPing() {
@@ -143,6 +161,7 @@ class Roll extends SqRootScript
 
 class PlayerRolling extends SqRootScript
 {
+    // TODO: do we still need this metaprop and script?
 }
 
 class RollStuntDouble extends SqRootScript
@@ -281,5 +300,19 @@ class DebugSpawnStuntDouble extends SqRootScript
         Physics.ControlCurrentRotation(o);
         // TODO: make sure this goes in the right direction!!
         Physics.SetVelocity(o, vector(-30,0,0));
+    }
+}
+
+class DebugSprint extends SqRootScript
+{
+    // 
+    function OnTurnOn() {
+        print("DebugSprint: "+message().message);
+        DrkInv.AddSpeedControl("Sprint", 1.8, 1.0);
+    }
+
+    function OnTurnOff() {
+        print("DebugSprint: "+message().message);
+        DrkInv.RemoveSpeedControl("Sprint");
     }
 }
