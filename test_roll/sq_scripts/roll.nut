@@ -16,34 +16,53 @@
 //      abuse; would it be a hold or a toggle?
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
 
-class CmdCrouchRoll extends SqRootScript
+class CmdRoll extends SqRootScript
 {
     function OnPing() {
-        print("Ping CmdCrouchRoll"
-            +" data:"+message().data
-            +" data2:"+message().data2
-            +" data3:"+message().data3);
-        SendMessage("Player", "ToggleCrouch", message().data, message().data2, message().data3)
+        print("Ping CmdRoll"
+            +" data:"+(message().data==null? "null" : message().data)
+            +" data2:"+(message().data==null? "null" : message().data2)
+            +" data3:"+(message().data==null? "null" : message().data3));
+        SendMessage("Player", "CmdRoll", message().data, message().data2, message().data3)
     }
 }
 
 class Roll extends SqRootScript
 {
+    m_footContacts = null; // Foot tracks terrain and object contacts.
+    m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
+
+    constructor() {
+        m_footContacts = {};
+        m_footContacts["terrain"] <- 0;
+        m_shinContacts = {};
+    }
+
     function OnBeginScript() {
-        ActReact.SubscribeToStimulus(self, "BashStim");
-        if (! IsDataSet("PressTime")) {
-            SetData("PressTime", 0.0);
+        if (Object.InheritsFrom(self, "Avatar")
+        || self==Object.Named("Player")) {
+            Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg|ePhysScriptMsgType.kContactMsg);
+            ActReact.SubscribeToStimulus(self, "BashStim");
+            if (! IsDataSet("PressTime")) {
+                SetData("PressTime", 0.0);
+            }
+
+            SetOneShotTimer("DumpFootContacts", 2.0);
         }
     }
 
     function OnEndScript() {
-        ActReact.UnsubscribeToStimulus(self, "BashStim");
+        if (Object.InheritsFrom(self, "Avatar")
+        || self==Object.Named("Player")) {
+            Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg|ePhysScriptMsgType.kContactMsg);
+            ActReact.UnsubscribeToStimulus(self, "BashStim");
+        }
     }
 
     function DumpVelocity() {
         local vel = vector();
         Physics.GetVelocity(self, vel);
-        print("Z vel:"+vel.z);
+        print("  Z vel:"+vel.z);
     }
 
     function CheckGrounded() {
@@ -66,7 +85,7 @@ class Roll extends SqRootScript
             2 /* return any hit object or terrain */,
             1 /* ignore mesh objects */,
             self /* ignore player */, 0);
-        print("hit type:"+hit_type+" pos:"+hit_pos+" obj:"+hit_obj.tointeger());
+        print("  hit type:"+hit_type+" pos:"+hit_pos+" obj:"+hit_obj.tointeger());
         switch (hit_type) {
         case 0: // No hit
         case 3: // Mesh object
@@ -77,7 +96,7 @@ class Roll extends SqRootScript
         }
     }
 
-    function OnToggleCrouch() {
+    function OnCmdRoll() {
         // TODO: check if controls are locked out, e.g. from remote camera or NoMove() script api?
         switch (DarkGame.GetPlayerMode()) {
         case ePlayerMode.kPM_Stand:
@@ -117,19 +136,36 @@ class Roll extends SqRootScript
 
     function HandleCrouch(crouch) {
         local isOnGround = CheckGrounded();
-        print("isOnGround:"+isOnGround);
+        print("  isOnGround:"+isOnGround);
         DumpVelocity();
 
         if (isOnGround) {
-            print("crouch: "+crouch);
+            print("  crouch: "+crouch);
             DarkGame.PlayerMode(crouch? ePlayerMode.kPM_Crouch : ePlayerMode.kPM_Stand);
         } else {
             SetData("PressTime", GetTime());
         }
     }
 
+    function OnTimer() {
+        if (message().name=="DumpFootContacts") {
+            print(": contacts:"+HasFootContacts()+" terrainOnly:"+HasFootContacts(true));
+            print("    Foot:");
+            foreach (key,value in m_footContacts) {
+                print("      "+key+":"+value);
+            }
+            print("    Shin:");
+            foreach (key,value in m_shinContacts) {
+                print("      "+key+":"+value);
+            }
+            SetOneShotTimer("DumpFootContacts", 2.0);
+        }
+    }
+
     function OnBashStimStimulus() {
-        print("BashStim intensity:"+message().intensity
+        print("BashStim"
+            +" time:"+GetTime()
+            +" intensity:"+message().intensity
             +" sensor:"+message().sensor
             +" source:"+desc(message().source));
         DumpVelocity();
@@ -138,11 +174,11 @@ class Roll extends SqRootScript
         //       if source==0 and velocity<(-15? 0?), then it
         //       is fall damage.
         local timeElapsed = (GetTime()-GetData("PressTime"));
-        print("Time since last crouch press: "+timeElapsed);
+        print("  Time since last crouch press: "+timeElapsed);
         // TODO: tune press window
         // TODO: maybe allow slight window after hitting ground?
         if (0.0<=timeElapsed && timeElapsed<=0.2) {
-            print("************ roll ************");
+            print("  ************ roll ************");
             // TODO: check for space to roll?
             // TODO: do a roll
         } else {
@@ -153,9 +189,122 @@ class Roll extends SqRootScript
     }
 
     function OnDamage() {
-        print("Damage kind:"+message().kind
+        print("Damage"
+            +" time:"+GetTime()
+            +" kind:"+message().kind
             +" damage:"+message().damage
             +" culprit:"+message().culprit);
+    }
+
+    function OnPhysCollision() {
+        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
+            local typeString = "unknown";
+            switch(message().collType) {
+            case ePhysCollisionType.kCollNone: typeString = "none"; break;
+            case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
+            case ePhysCollisionType.kCollObject: typeString = "object"; break;
+            }
+            print(message().message
+                +" bodypart:"+message().Submod
+                +" time:"+GetTime()
+                +" type:"+typeString
+                +" obj:"+desc(message().collObj)
+                +" submod:"+message().collSubmod
+                +" momentum:"+message().collMomentum
+                +" normal.z:"+message().collNormal.z
+                +" pos:"+message().collPt);
+        }
+    }
+
+    function TrackFootContact(createContact) {
+        // Track terrain face / object contacts. CAll this only from
+        // PhysContactCreate/PhysContactDestroy handlers.
+        local isFoot = (message().Submod==1); // PLAYER_FOOT
+        local isShin = (message().Submod==4); // PLAYER_SHIN
+        if (! isFoot && ! isShin) return;
+
+        local key;
+        switch (message().contactType) {
+        case ePhysContactType.kContactFace:
+            // Not interested in terrain contacts for anything except the foot.
+            if (! isFoot) return;
+            key = "terrain";
+            break;
+        case ePhysContactType.kContactSphere:
+        case ePhysContactType.kContactSphereHat:
+        case ePhysContactType.kContactOBB:
+            local objid = (message().contactObj).tointeger();
+            local submod = (message().contactSubmod).tointeger();
+            key = ""+objid+","+submod;
+            break;
+        default: return;
+        }
+
+        local table = (isFoot? m_footContacts : m_shinContacts);
+        local count = 0;
+        if (table.rawin(key)) {
+            count = table.rawget(key);
+        }
+        count += (createContact? 1 : -1);
+        if (count<0) { count = 0; print("### Count underflow for "+key); }
+        if (count>0 || key=="terrain") {
+            table.rawset(key, count);
+        } else {
+            table.rawdelete(key);
+        }
+    }
+
+    function HasFootContacts(terrainOnly=false) {
+        local terrainContacts = (m_footContacts.rawget("terrain")>0);
+        local otherContacts = (m_footContacts.len()>1) || (m_shinContacts.len()>1);
+        if (terrainOnly)
+            return terrainContacts;
+        else
+            return (terrainContacts || otherContacts);
+    }
+
+    function OnPhysContactCreate() {
+        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
+            local typeString = "unknown";
+            switch (message().contactType) {
+            case ePhysContactType.kContactNone: typeString = "none"; break;
+            case ePhysContactType.kContactFace: typeString = "face"; break;
+            case ePhysContactType.kContactEdge: typeString = "edge"; break;
+            case ePhysContactType.kContactVertex: typeString = "vertex"; break;
+            case ePhysContactType.kContactSphere: typeString = "sphere"; break;
+            case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
+            case ePhysContactType.kContactOBB: typeString = "obb"; break;
+            }
+            print(message().message
+                +" bodypart:"+message().Submod
+                +" time:"+GetTime()
+                +" type:"+typeString
+                +" obj:"+desc(message().contactObj)
+                +" submod:"+message().contactSubmod);
+        }
+        TrackFootContact(true);
+    }
+
+    function OnPhysContactDestroy() {
+        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
+            local typeString = "unknown";
+            switch (message().contactType) {
+            case ePhysContactType.kContactNone: typeString = "none"; break;
+            case ePhysContactType.kContactFace: typeString = "face"; break;
+            case ePhysContactType.kContactEdge: typeString = "edge"; break;
+            case ePhysContactType.kContactVertex: typeString = "vertex"; break;
+            case ePhysContactType.kContactSphere: typeString = "sphere"; break;
+            case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
+            case ePhysContactType.kContactOBB: typeString = "obb"; break;
+            }
+            print(message().message
+                +" bodypart:"+message().Submod
+                +" time:"+GetTime()
+                +" type:"+typeString
+                +" obj:"+desc(message().contactObj)
+                +" submod:"+message().contactSubmod);
+        }
+        TrackFootContact(false);
     }
 }
 
