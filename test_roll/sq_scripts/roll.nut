@@ -404,7 +404,6 @@ class Roll extends SqRootScript
         // TODO: maybe allow slight window after hitting ground?
         if (0.0<=timeElapsed && timeElapsed<=0.2) {
             print("  ************ roll ************");
-            // TODO: check for space to roll?
             // TODO: do a roll
         } else {
             // TODO: stochastic round?
@@ -568,7 +567,11 @@ class RollStuntDouble extends SqRootScript
     function OnRollBegin() {
         if (! DEBUG_NOTELEPORT) {
             DarkGame.PlayerMode(ePlayerMode.kPM_Crouch);
-            DarkGame.NoMove(true);
+            // NOTE: Using NoMove() kills the ability to hold W through the roll,
+            //       which sucks. But using Add/RemoveSpeedControl() does not
+            //       interfere with the input handling! And since we set the
+            //       player's velocity to zero anyway, the result is perfect.
+            DrkInv.AddSpeedControl("RollGlue", 0.0, 1.0);
         }
 
         // NOTE: Teleporting the player does not break contacts, so if the
@@ -588,7 +591,6 @@ class RollStuntDouble extends SqRootScript
         // NOTE: We can't remove PhysType from the player, because when adding
         //       it again, its just a default 1 big sphere, not the correct 5 submodels.
         Property.SetSimple("Player", "CollisionType", 0); // None
-        //Property.Remove("Player", "PhysType");
 
         local spinner = Object.Create("fnord");
         Property.SetSimple(spinner, "ModelName", "axisjoints"); // has rotary joint
@@ -660,7 +662,7 @@ class RollStuntDouble extends SqRootScript
             Object.Teleport("Player", pos, fac, 0);
             // TODO: see if there is room to stand; stay crouched if not.
             DarkGame.PlayerMode(ePlayerMode.kPM_Stand);
-            DarkGame.NoMove(false);
+            DrkInv.RemoveSpeedControl("RollGlue");
         }
         if (! DEBUG_NOATTACH)
             Camera.ForceCameraReturn();
