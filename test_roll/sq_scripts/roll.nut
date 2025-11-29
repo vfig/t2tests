@@ -60,10 +60,17 @@ class Roll extends SqRootScript
             if (! IsDataSet("IsRolling")) SetData("IsRolling", FALSE);
             // Time roll was pressed (while not grounded).
             if (! IsDataSet("PressTime")) SetData("PressTime", 0.0);
+            // Position to roll from (stunt double spawn point).
+            if (! IsDataSet("RollPos")) SetData("RollPos", vector());
+            // Velocity to roll with.
+            if (! IsDataSet("RollVelocity")) SetData("RollVelocity", vector());
+            // Whether to cancel an imminent roll.
+            if (! IsDataSet("CancelRoll")) SetData("CancelRoll", FALSE);
             // Time last BashStim came in.
             if (! IsDataSet("BashTime")) SetData("BashTime", 0.0);
             // Intensity of last BashStim.
             if (! IsDataSet("BashIntensity")) SetData("BashIntensity", 0.0);
+
 
             if (DEBUG_LOG_GROUNDED) SetOneShotTimer("DumpGrounded", 2.0);
         }
@@ -77,6 +84,11 @@ class Roll extends SqRootScript
                  ePhysScriptMsgType.kCollisionMsg
                 |ePhysScriptMsgType.kContactMsg);
         }
+    }
+
+    function OnSlain() {
+        // Death cannot stop true love, but it can stop rolls.
+        SetData("CancelRoll", TRUE);
     }
 
     // TODO: remove
@@ -153,21 +165,7 @@ class Roll extends SqRootScript
 
     function DoRoll(velocity) {
         if (GetData("IsRolling")) return;
-
-        // TEMP: launch sensors, see how those work. do nothing else yet.
-        local pos = Object.Position(self);
-        // Disable collision on the player so the sensors don't collide with us.
-        Property.SetSimple("Player", "CollisionType", 0);
-        // TODO: make sure we restore player collision afterwards!!
-        SpawnSensor(pos, vector(-1,0,0), "x-");
-        SpawnSensor(pos, vector( 1,0,0), "x+");
-        SpawnSensor(pos, vector(0,-1,0), "y-");
-        SpawnSensor(pos, vector(0, 1,0), "y+");
-        SpawnSensor(pos, vector(0,0,-1), "z-");
-        SpawnSensor(pos, vector(0,0, 1), "z+");
-        PostMessage(self, "RollSensorWait");
-        return;
-
+        SetData("IsRolling", TRUE);
 
         // Doing a roll is too dangerous for the player, so we have a stunt
         // double do it. (We can't actually manage the player's physics nor
@@ -184,12 +182,7 @@ class Roll extends SqRootScript
         //       stunt double relative to our head/camera so that we can
         //       dive roll onto tables and other lowish surfaces!
 
-        // TODO: also support sideways/diagonal rolls if the player is strafing!
-        //       (which means the player facing we restore to will not always
-        //       be the same direction as the roll velocity).
-
         local arch = Object.Named("StuntDouble");
-
         local relpos = vector();
         local relfac = vector();
         Object.CalcRelTransform(self, self, relpos, relfac,
@@ -197,24 +190,128 @@ class Roll extends SqRootScript
         local footpos = Object.ObjectToWorld(self, -relpos);
         local radius = Property.Get(arch, "PhysDims", "Radius 1");
         local spawnpos = footpos+vector(0,0,radius+0.05);
+        SetData("RollPos", spawnpos);
+        SetData("RollVelocity", velocity);
+        SetData("CancelRoll", FALSE);
+
+        // Launch sensors out to see if there is enough room for the stunt
+        // double to fit.
+        SetData("SensorDistPos", vector(8.0,8.0,0.0));
+        SetData("SensorDistNeg", vector(8.0,8.0,0.0));
+        // TODO: ditch the names
+        SpawnSensor(spawnpos, vector(-1,0,0), "x-");
+        SpawnSensor(spawnpos, vector( 1,0,0), "x+");
+        SpawnSensor(spawnpos, vector(0,-1,0), "y-");
+        SpawnSensor(spawnpos, vector(0, 1,0), "y+");
+        PostMessage(self, "RollSensorWait");
+    }
+
+    function SpawnSensor(pos, dir, name) {
+        local relDir = Object.ObjectToWorld(self, dir) - Object.Position(self);
+        local sensorVelocity = 1000.0;
+        name = "RollSensor "+name;
+        local sensor = Object.BeginCreate("object")
+        try {
+            Object.SetName(sensor, name);
+            Object.Teleport(sensor, pos, vector(), 0);
+            Property.Set(sensor, "Scripts", "Script 0", "RollSensor");
+        } catch(e) {}
+        Object.EndCreate(sensor);
+        SendMessage(sensor, "RollSensorDirection", dir);
+        Physics.SetVelocity(sensor, relDir*sensorVelocity);
+    }
+
+    function OnRollSensorHit() {
+        local dir = message().data;
+        local dist = message().data2;
+        // Store the sensor reports.
+        if (dir.x>0) {
+            local v = GetData("SensorDistPos");
+            v.x = dist;
+            SetData("SensorDistPos", v);
+        } else if (dir.x<0) {
+            local v = GetData("SensorDistNeg");
+            v.x = dist;
+            SetData("SensorDistNeg", v);
+        } else if (dir.y>0) {
+            local v = GetData("SensorDistPos");
+            v.y = dist;
+            SetData("SensorDistPos", v);
+        } else if (dir.y<0) {
+            local v = GetData("SensorDistNeg");
+            v.y = dist;
+            SetData("SensorDistNeg", v);
+        }
+
+        if (DEBUG_LOG_SENSORS) {
+            print(message().message
+                +" from:"+desc(message().from)
+                +" dir:"+dir
+                +" dist:"+dist);
+        }
+    }
+
+    function OnRollSensorWait() {
+        // Have to wait another frame for the reports to come in :(
+        PostMessage(self, "RollSensorFollowUp");
+    }
+
+    function OnRollSensorFollowUp() {
+        // Abort the roll if something happened in the few frames we were waiting.
+        if (GetData("CancelRoll")) {
+            SetData("IsRolling", FALSE);
+            return;
+        }
+
+        local arch = Object.Named("StuntDouble");
+        local spawnpos = GetData("RollPos");
+        local velocity = GetData("RollVelocity");
+
+        // Check if sensors report enough room.
+        local vpos = GetData("SensorDistPos");
+        local vneg = GetData("SensorDistNeg");
+        if (DEBUG_LOG_SENSORS) {
+            print(message().message
+                +" time:"+GetTime()
+                +" -------------------------------------------------------------");
+            print("Available space:"
+                +" x:"+vneg.x+","+vpos.x
+                +" y:"+vneg.y+","+vpos.y);
+        }
+        // TODO: see if we can adjust for back to a wall situation.
+        local radius = Property.Get(arch, "PhysDims", "Radius 1");
+        if (vneg.x<radius || vpos.x<radius
+        || vneg.y<radius || vpos.y<radius) {
+            print("Sensors report not enough room for StuntDouble; aborting roll.");
+            SetData("IsRolling", FALSE);
+            Sound.PlaySchema(0, "gardrop");
+            return;
+        }
+
+        // TODO: also support sideways/diagonal rolls if the player is strafing!
+        //       (which means the player facing we restore to will not always
+        //       be the same direction as the roll velocity).
         local spawnfac = Object.Facing(self);
         
         local o = Object.BeginCreate(arch)
         Object.Teleport(o, spawnpos, spawnfac, 0);
         Object.EndCreate(o);
-        // BUG: Physics.ValidPos() does not check against objects, so will allow
-        //      rolling through doors!
-        if (Physics.ValidPos(o)) {
-            Physics.ControlCurrentRotation(o);
-            Physics.SetVelocity(o, velocity);
-            print("ROLL BEGIN. velocity:"+velocity);
-            SetData("IsRolling", TRUE);
-            SendMessage(o, "RollBegin");
-        } else {
-            print("Invalid position for StuntDouble; aborting roll.");
+        // NOTE: Physics.ValidPos() does not check against objects, so will allow
+        //       rolling through doors. We have the whole sensor rigmarole above
+        //       to manage that. We still double-check ValidPos() here so as to
+        //       guarantee not rolling through terrain.
+        if (! Physics.ValidPos(o)) {
+            print("Physics repots invalid position for StuntDouble; aborting roll.");
+            SetData("IsRolling", FALSE);
             Sound.PlaySchema(0, "gardrop");
             Object.Destroy(o);
         }
+
+        // Start rolling!
+        Physics.ControlCurrentRotation(o);
+        Physics.SetVelocity(o, velocity);
+        print("ROLL BEGIN. velocity:"+velocity);
+        SendMessage(o, "RollBegin");
     }
 
     function OnRollComplete() {
@@ -408,44 +505,6 @@ class Roll extends SqRootScript
             }
         }
     }
-
-    function SpawnSensor(pos, dir, name) {
-        dir = Object.ObjectToWorld(self, dir) - Object.Position(self);
-        print("dir: "+dir);
-        local sensorVelocity = 1000.0;
-        name = "RollSensor "+name;
-        local sensor = Object.BeginCreate("object")
-        try {
-            Object.SetName(sensor, name);
-            Object.Teleport(sensor, pos, vector(), 0);
-            Property.Set(sensor, "Scripts", "Script 0", "RollSensor");
-        } catch(e) {}
-        Object.EndCreate(sensor);
-        Physics.SetVelocity(sensor, dir*sensorVelocity);
-    }
-
-    function OnRollSensorHit() {
-        local collDist = message().data;
-        //local collObj = message().data2;
-        //local collNorm = message().data3;
-
-        print(message().message
-            +" from:"+desc(message().from)
-            +" dist:"+collDist);
-    }
-
-    function OnRollSensorWait() {
-        print(message().message
-            +" time:"+GetTime());
-        // Have to wait another frame for the reports to come in :(
-        PostMessage(self, "RollSensorFollowUp");
-    }
-
-    function OnRollSensorFollowUp() {
-        print(message().message
-            +" time:"+GetTime()
-            +" -------------------------------------------------------------");
-    }
 }
 
 class PlayerRolling extends SqRootScript
@@ -572,7 +631,7 @@ class RollStuntDouble extends SqRootScript
 
         local vel = vector();
         Physics.GetVelocity(self, vel);
-        // TODO: if this works, save/load the CollisionType instead of hardcoding.
+        // TODO: save/load the CollisionType instead of hardcoding?
         Property.SetSimple("Player", "CollisionType", 0x1); // Bounce
         SendMessage("Player", "RollComplete", vel);
 
@@ -597,6 +656,10 @@ class RollSpinner extends SqRootScript
 class RollSensor extends SqRootScript
 {
     function OnCreate() {
+        // NOTE: even though these sensors do not bash or push objects they
+        //       collide with, they can still cause minor perturbations that
+        //       for example can make stacked crates fall through each other,
+        //       usually after a few hits. Gonna live with it.
         SetProperty("PhysType", "Type", 1); // Sphere
         SetProperty("PhysType", "# Submodels", 1);
         SetProperty("PhysDims", "Radius 1", Roll.ROLL_SENSOR_RADIUS);
@@ -605,12 +668,13 @@ class RollSensor extends SqRootScript
         SetProperty("PhysAttr", "Mass", 0.0);
         SetProperty("CollisionType", 0x3); // Bounce|Destroy On Impact
         SetProperty("BashFactor", 0.0); // Don't cause any impact damage.
+        SetProperty("RenderType", 1); // Not Rendered.
         // Self destruct if we dont collide pretty quickly:
         SetProperty("CfgTweqDelete", "Halt", TWEQ_HALT_SLAY);
         SetProperty("CfgTweqDelete", "AnimC", TWEQ_AC_SIM);
         SetProperty("CfgTweqDelete", "Misc", 0);
         SetProperty("CfgTweqDelete", "CurveC", 0);
-        SetProperty("CfgTweqDelete", "Rate", 125);
+        SetProperty("CfgTweqDelete", "Rate", 67);
         SetProperty("StTweqDelete", "AnimS", TWEQ_AS_ONOFF);
 
         SetData("StartTime", GetTime());
@@ -627,6 +691,10 @@ class RollSensor extends SqRootScript
              ePhysScriptMsgType.kCollisionMsg);
     }
 
+    function OnRollSensorDirection() {
+        SetData("Direction", message().data);
+    }
+
     function OnPhysCollision() {
         // NOTE: message().collPt is a lie when an OBB is hit at high speed (and
         //       maybe also other object types). So we can't use it to get
@@ -641,24 +709,28 @@ class RollSensor extends SqRootScript
 
         if (Roll.DEBUG_LOG_SENSORS) {
             local typeString = "unknown";
+            local objString = "-";
             switch(message().collType) {
             case ePhysCollisionType.kCollNone: typeString = "none"; break;
             case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
-            case ePhysCollisionType.kCollObject: typeString = "object"; break;
+            case ePhysCollisionType.kCollObject:
+                typeString = "object";
+                objString = desc(message().collObj);
+                break;
             }
             print(desc(self)+" "+message().message
                 +" elapsed:"+(GetTime()-fromTime)
                 +" type:"+typeString
-                +" obj:"+desc(message().collObj)
-                //+" fromPos:"+fromPos
+                +" obj:"+objString
                 +" pos:"+collPos
                 +" dist:"+dist);
         }
 
+        local direction = (IsDataSet("Direction")? GetData("Direction") : vector());
         SendMessage("Player", "RollSensorHit",
+            direction,
             dist,
-            (message().collObj).tointeger(),
-            message().collNormal);
+            (message().collObj).tointeger());
         //Object.Destroy(self);
         Reply(ePhysMessageResult.kPM_StatusQuo);
     }
