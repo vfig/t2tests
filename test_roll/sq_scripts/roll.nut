@@ -162,6 +162,15 @@ class Roll extends SqRootScript
         // relative to our foot instead (so its stance-independent). We add
         // a tiny bit of extra z clearance in case the foot is just under
         // something.
+
+        // TODO: if we are in midair though, we probably want to position the
+        //       stunt double relative to our head/camera so that we can
+        //       dive roll onto tables and other lowish surfaces!
+
+        // TODO: also support sideways/diagonal rolls if the player is strafing!
+        //       (which means the player facing we restore to will not always
+        //       be the same direction as the roll velocity).
+
         local relpos = vector();
         local relfac = vector();
         Object.CalcRelTransform(self, self, relpos, relfac,
@@ -173,10 +182,6 @@ class Roll extends SqRootScript
         Object.Teleport(o, spawnpos, spawnfac, 0);
         // BUG: Physics.ValidPos() does not check against objects, so will allow
         //      rolling through doors!
-        // BUG: Teleporting the player does not break contacts, so if the player
-        //      is pressed up against an object, then rolls, the physic engine
-        //      still thinks theyre pressed up against it after the telport,
-        //      and they cant then walk in that direction. VERY BAD!!!!!!
         if (Physics.ValidPos(o)) {
             Physics.ControlCurrentRotation(o);
             Physics.SetVelocity(o, velocity);
@@ -408,8 +413,26 @@ class RollStuntDouble extends SqRootScript
             DarkGame.PlayerMode(ePlayerMode.kPM_Crouch);
             DarkGame.NoMove(true);
         }
+
+        // NOTE: Teleporting the player does not break contacts, so if the
+        //       player is pressed up against an object, then rolls, the physics
+        //       engine still thinks theyre pressed up against it after the
+        //       teleport, and they cant then walk in that direction. VERY BAD!
+        //
+        //       However, a very handy side effect of Physics.SetVelocity() is
+        //       that it breaks ALL terrain and object contacts! So we use it
+        //       here not just to stop the player moving, but also for that
+        //       side effect!
+        Physics.SetVelocity("Player", vector());
+
         // TODO: unphysicalise the player (can we?) and DetailAttach them to
-        //       the stunt double too.
+        //       the stunt double too. (and make them 100% transparent?)
+
+        // NOTE: We can't remove PhysType from the player, because when adding
+        //       it again, its just a default 1 big sphere, not the correct 5 submodels.
+        Property.SetSimple("Player", "CollisionType", 0); // None
+        //Property.Remove("Player", "PhysType");
+
         local spinner = Object.Create("fnord");
         Property.SetSimple(spinner, "ModelName", "axisjoints"); // has rotary joint
         if (DEBUG_VISIBLEPARTS)
@@ -489,6 +512,8 @@ class RollStuntDouble extends SqRootScript
 
         local vel = vector();
         Physics.GetVelocity(self, vel);
+        // TODO: if this works, save/load the CollisionType instead of hardcoding.
+        Property.SetSimple("Player", "CollisionType", 0x1); // Bounce
         SendMessage("Player", "RollComplete", vel);
 
         if (! DEBUG_NODESTROY)
