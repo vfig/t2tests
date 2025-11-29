@@ -19,10 +19,6 @@
 class CmdRoll extends SqRootScript
 {
     function OnPing() {
-        print("Ping CmdRoll"
-            +" data:"+(message().data==null? "null" : message().data)
-            +" data2:"+(message().data==null? "null" : message().data2)
-            +" data3:"+(message().data==null? "null" : message().data3));
         SendMessage("Player", "CmdRoll", message().data, message().data2, message().data3)
     }
 }
@@ -35,6 +31,7 @@ class Roll extends SqRootScript
     static DEBUG_LOG_GROUNDED = false;
 
     static ROLL_VELOCITY_BOOST = 20.0;
+    static ROLL_MINIMUM_FORWARD_SPACE = 6.0;
     static ROLL_SENSOR_RADIUS = 0.25;
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
@@ -64,6 +61,9 @@ class Roll extends SqRootScript
             if (! IsDataSet("RollPos")) SetData("RollPos", vector());
             // Velocity to roll with.
             if (! IsDataSet("RollVelocity")) SetData("RollVelocity", vector());
+            // Sensor directions in world space.
+            if (! IsDataSet("RollSensorDirX")) SetData("RollSensorDirX", vector());
+            if (! IsDataSet("RollSensorDirY")) SetData("RollSensorDirY", vector());
             // Whether to cancel an imminent roll.
             if (! IsDataSet("CancelRoll")) SetData("CancelRoll", FALSE);
             // Time last BashStim came in.
@@ -110,7 +110,6 @@ class Roll extends SqRootScript
             // NOTE: After mantling a Sphere Hat object, you often remain in
             //       Jump mode, which is (at least partly) why you cant crouch
             //       until you move enough to step and go back to Stand mode.
-            print("Stand/BodyCarry/Crouch/Jump: -> roll (if grounded).");
             HandleCmdRoll();
             break;
 
@@ -119,7 +118,6 @@ class Roll extends SqRootScript
         case ePlayerMode.kPM_Climb:
         case ePlayerMode.kPM_Slide:
         case ePlayerMode.kPM_Dead:
-            print("Swim/Climb/Slide/Dead: ignoring roll.");
             break;
         }
     }
@@ -144,7 +142,7 @@ class Roll extends SqRootScript
 
             // Boost velocity so we can roll from standing, or roll much
             // farther while running.
-            print("vel mag:"+vel.Length());
+            print("Roll: vel mag:"+vel.Length());
             local boost = ROLL_VELOCITY_BOOST;
             if (IsGrounded()) {
             } else {
@@ -153,7 +151,7 @@ class Roll extends SqRootScript
                 boost *= 0.5;
             }
             vel += (forward*boost)
-            print("boost mag:"+vel.Length());
+            print("Roll: boost mag:"+vel.Length());
 
             DoRoll(vel);
         } else {
@@ -198,16 +196,22 @@ class Roll extends SqRootScript
         // double to fit.
         SetData("SensorDistPos", vector(8.0,8.0,0.0));
         SetData("SensorDistNeg", vector(8.0,8.0,0.0));
+
+        // TODO: sensor 'local' direction MUST BE IN VELOCITY direction, not
+        //       in FACING direction. so these are wrong!
+        local worldXDir = (Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self));
+        local worldYDir = (Object.ObjectToWorld(self, vector(0,1,0))-Object.Position(self));
+        SetData("RollSensorDirX", worldXDir);
+        SetData("RollSensorDirY", worldYDir);
         // TODO: ditch the names
-        SpawnSensor(spawnpos, vector(-1,0,0), "x-");
-        SpawnSensor(spawnpos, vector( 1,0,0), "x+");
-        SpawnSensor(spawnpos, vector(0,-1,0), "y-");
-        SpawnSensor(spawnpos, vector(0, 1,0), "y+");
+        SpawnSensor(spawnpos, vector(-1,0,0), -worldXDir, "X-");
+        SpawnSensor(spawnpos, vector( 1,0,0), worldXDir, "X+");
+        SpawnSensor(spawnpos, vector(0,-1,0), -worldYDir, "Y-");
+        SpawnSensor(spawnpos, vector(0, 1,0), worldYDir, "Y+");
         PostMessage(self, "RollSensorWait");
     }
 
-    function SpawnSensor(pos, dir, name) {
-        local relDir = Object.ObjectToWorld(self, dir) - Object.Position(self);
+    function SpawnSensor(pos, localDir, worldDir, name) {
         local sensorVelocity = 1000.0;
         name = "RollSensor "+name;
         local sensor = Object.BeginCreate("object")
@@ -217,8 +221,8 @@ class Roll extends SqRootScript
             Property.Set(sensor, "Scripts", "Script 0", "RollSensor");
         } catch(e) {}
         Object.EndCreate(sensor);
-        SendMessage(sensor, "RollSensorDirection", dir);
-        Physics.SetVelocity(sensor, relDir*sensorVelocity);
+        SendMessage(sensor, "RollSensorDirection", localDir);
+        Physics.SetVelocity(sensor, worldDir*sensorVelocity);
     }
 
     function OnRollSensorHit() {
@@ -278,14 +282,40 @@ class Roll extends SqRootScript
                 +" x:"+vneg.x+","+vpos.x
                 +" y:"+vneg.y+","+vpos.y);
         }
-        // TODO: see if we can adjust for back to a wall situation.
         local radius = Property.Get(arch, "PhysDims", "Radius 1");
-        if (vneg.x<radius || vpos.x<radius
+        local minForward = ROLL_MINIMUM_FORWARD_SPACE;
+        if (minForward<radius) minForward = radius;
+
+        if (vneg.x<radius || vpos.x<minForward
         || vneg.y<radius || vpos.y<radius) {
-            print("Sensors report not enough room for StuntDouble; aborting roll.");
-            SetData("IsRolling", FALSE);
-            Sound.PlaySchema(0, "gardrop");
-            return;
+            // Not enough room.
+            local adjusted = false;
+            if (vpos.x>=minForward) {
+                // If its only behind/left/right of us that there's not enough
+                // room, try nudging the spawn pos instead of aborting.
+                if (vneg.x<radius && (vpos.x+vneg.x)>2*radius) {
+                    print("Roll: Adjusting spawn pos in +X");
+                    spawnpos += GetData("RollSensorDirX")*vneg.x; // TODO: epsilon?
+                    adjusted = true;
+                }
+                if (vneg.y<radius && (vpos.y+vneg.y)>2*radius) {
+                    print("Roll: Adjusting spawn pos in +Y");
+                    spawnpos += GetData("RollSensorDirY")*vneg.y; // TODO: epsilon?
+                    adjusted = true;
+                }
+                if (vpos.y<radius && (vpos.y+vneg.y)>2*radius) {
+                    print("Roll: Adjusting spawn pos in -Y");
+                    spawnpos -= GetData("RollSensorDirY")*vpos.y; // TODO: epsilon?
+                    adjusted = true;
+                }
+            }
+            if (! adjusted) {
+                // Nope, not enough room anywhere.
+                print("Roll: Sensors report not enough room for StuntDouble; aborting roll.");
+                SetData("IsRolling", FALSE);
+                Sound.PlaySchema(0, "gardrop");
+                return;
+            }
         }
 
         // TODO: also support sideways/diagonal rolls if the player is strafing!
@@ -301,7 +331,7 @@ class Roll extends SqRootScript
         //       to manage that. We still double-check ValidPos() here so as to
         //       guarantee not rolling through terrain.
         if (! Physics.ValidPos(o)) {
-            print("Physics repots invalid position for StuntDouble; aborting roll.");
+            print("Roll: Physics reports invalid position for StuntDouble; aborting roll.");
             SetData("IsRolling", FALSE);
             Sound.PlaySchema(0, "gardrop");
             Object.Destroy(o);
@@ -356,7 +386,7 @@ class Roll extends SqRootScript
         //       if source==0 and velocity<(-15? 0?), then it
         //       is fall damage.
         local timeElapsed = (GetTime()-GetData("PressTime"));
-        print("  Time since last crouch press: "+timeElapsed);
+        print("  Roll: Time since last roll press: "+timeElapsed);
         // TODO: tune press window
         // TODO: maybe allow slight window after hitting ground?
         if (0.0<=timeElapsed && timeElapsed<=0.2) {
@@ -435,7 +465,7 @@ class Roll extends SqRootScript
             count = table.rawget(key);
         }
         count += (createContact? 1 : -1);
-        if (count<0) { count = 0; print("### Count underflow for "+key); }
+        if (count<0) { count = 0; print("ERROR: contact count underflow for "+key); }
         if (count>0 || key=="terrain") {
             table.rawset(key, count);
         } else {
@@ -731,7 +761,6 @@ class RollSensor extends SqRootScript
             direction,
             dist,
             (message().collObj).tointeger());
-        //Object.Destroy(self);
         Reply(ePhysMessageResult.kPM_StatusQuo);
     }
 
