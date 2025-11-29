@@ -1,12 +1,3 @@
-// TODO: PROBLEMS
-//    - cant reliably detect if standing on OBB/Sphere/Sphere Hat object [for crouch override]
-//    - cant detach from ladders/ropes [for crouch override]
-//    - cant handle "hold crouch" variant [for crouch override]
-//    - cant detect key _held_ properly (just get repeat pings)
-//          - _could_ have script that adds metaprop to player if not present,
-//            or pings player to postpone removal of metaprop if present; but
-//            the delay and repeat rate is likely from the user's settings in the os??
-
 // TODO:
 //    - all the TODOs below.
 //    - damage reduction calculation not yet implemented
@@ -14,6 +5,10 @@
 //      but also when running/sprinting?
 //    - could maybe have a sprint button?? with stamina ofc to prevent too much
 //      abuse; would it be a hold or a toggle?
+//        - cant detect key _held_ properly (just get repeat pings)
+//            - _could_ have script that adds metaprop to player if not present,
+//              or pings player to postpone removal of metaprop if present; but
+//              the delay and repeat rate is likely from the user's settings in the os??
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
 
 class CmdRoll extends SqRootScript
@@ -33,6 +28,7 @@ class Roll extends SqRootScript
     static ROLL_VELOCITY_BOOST = 20.0;
     static ROLL_MINIMUM_FORWARD_SPACE = 6.0;
     static ROLL_SENSOR_RADIUS = 0.25;
+    static ROLL_CAMERA_OFFSETZ = 1.25;
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
@@ -87,6 +83,8 @@ class Roll extends SqRootScript
     }
 
     function OnSlain() {
+        // BUG: if you die during the roll (e.g. from radial stim),
+        //      you are still... in the wrong place? investigate.
         // Death cannot stop true love, but it can stop rolls.
         SetData("CancelRoll", TRUE);
     }
@@ -104,7 +102,6 @@ class Roll extends SqRootScript
         switch (DarkGame.GetPlayerMode()) {
         // Do a roll if grounded in these modes:
         case ePlayerMode.kPM_Stand:
-        case ePlayerMode.kPM_BodyCarry: // TODO: allow roll in BodyCarry and force body drop?
         case ePlayerMode.kPM_Crouch:
         case ePlayerMode.kPM_Jump:
             // NOTE: After mantling a Sphere Hat object, you often remain in
@@ -114,6 +111,7 @@ class Roll extends SqRootScript
             break;
 
         // Do nothing for other modes:
+        case ePlayerMode.kPM_BodyCarry: // TODO: allow roll in BodyCarry and force body drop?
         case ePlayerMode.kPM_Swim:
         case ePlayerMode.kPM_Climb:
         case ePlayerMode.kPM_Slide:
@@ -123,6 +121,8 @@ class Roll extends SqRootScript
     }
 
     function HandleCmdRoll() {
+        if (GetData("IsRolling")) return;
+
         // TEMP: experimenting with midair rolls?
         if (TRUE|| IsGrounded()) {
             // Do a roll now.
@@ -153,7 +153,8 @@ class Roll extends SqRootScript
             vel += (forward*boost)
             print("Roll: boost mag:"+vel.Length());
 
-            DoRoll(vel);
+            local fromFootLevel = IsGrounded();
+            DoRoll(vel, fromFootLevel);
         } else {
             // If we land imminently, we will do a roll then.
             SetData("PressTime", GetTime());
@@ -161,7 +162,7 @@ class Roll extends SqRootScript
         }
     }
 
-    function DoRoll(velocity) {
+    function DoRoll(velocity, fromFootLevel) {
         if (GetData("IsRolling")) return;
         SetData("IsRolling", TRUE);
 
@@ -175,19 +176,27 @@ class Roll extends SqRootScript
         // relative to our foot instead (so its stance-independent). We add
         // a tiny bit of extra z clearance in case the foot is just under
         // something.
-
-        // TODO: if we are in midair though, we probably want to position the
-        //       stunt double relative to our head/camera so that we can
-        //       dive roll onto tables and other lowish surfaces!
+        //
+        // But if we are in midair, we want to position the stunt double
+        // relative to our head/camera so that we can dive roll onto tables and
+        // other lowish surfaces. The 'fromFootLevel' parameter controls this.
+        // We also throw in a fudge amount here so you can still roll mid-jump
+        // when your head is right up against the ceiling (the fudge amount is
+        // small enough to not clip into the ground in very low situations).
 
         local arch = Object.Named("StuntDouble");
+        local radius = Property.Get(arch, "PhysDims", "Radius 1");
         local relpos = vector();
         local relfac = vector();
-        Object.CalcRelTransform(self, self, relpos, relfac,
-            4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
-        local footpos = Object.ObjectToWorld(self, -relpos);
-        local radius = Property.Get(arch, "PhysDims", "Radius 1");
-        local spawnpos = footpos+vector(0,0,radius+0.05);
+        local spawnpos;
+        if (fromFootLevel) {
+            Object.CalcRelTransform(self, self, relpos, relfac,
+                4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
+            local footpos = Object.ObjectToWorld(self, -relpos);
+            spawnpos = footpos+vector(0,0,radius+0.05);
+        } else {
+            spawnpos = Camera.GetPosition()-vector(0,0,Roll.ROLL_CAMERA_OFFSETZ+0.25);
+        }
         SetData("RollPos", spawnpos);
         SetData("RollVelocity", velocity);
         SetData("CancelRoll", FALSE);
@@ -340,7 +349,7 @@ class Roll extends SqRootScript
         // Start rolling!
         Physics.ControlCurrentRotation(o);
         Physics.SetVelocity(o, velocity);
-        print("ROLL BEGIN. velocity:"+velocity);
+        print("ROLL BEGIN. pos:"+spawnpos+" velocity:"+velocity);
         SendMessage(o, "RollBegin");
     }
 
@@ -618,7 +627,7 @@ class RollStuntDouble extends SqRootScript
         LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
         // TODO: offset for head location? this z offset is just me throwing numbers, its not quite the cam offset
-        LinkTools.LinkSetData(link, "rel pos", vector(0,0,1.25));
+        LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
         LinkTools.LinkSetData(link, "rel rot", vector());
 
         link = Link.Create("ScriptParams", self, anchor);
