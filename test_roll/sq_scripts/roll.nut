@@ -22,7 +22,7 @@ class Roll extends SqRootScript
 {
     static DEBUG_LOG_COLLISIONS = false;
     static DEBUG_LOG_CONTACTS = false;
-    static DEBUG_LOG_SENSORS = true;
+    static DEBUG_LOG_SENSORS = false;
     static DEBUG_LOG_GROUNDED = false;
 
     static ROLL_VELOCITY_BOOST = 20.0;
@@ -304,17 +304,17 @@ class Roll extends SqRootScript
                 // room, try nudging the spawn pos instead of aborting.
                 if (vneg.x<radius && (vpos.x+vneg.x)>2*radius) {
                     print("Roll: Adjusting spawn pos in +X");
-                    spawnpos += GetData("RollSensorDirX")*vneg.x; // TODO: epsilon?
+                    spawnpos += GetData("RollSensorDirX")*vneg.x;
                     adjusted = true;
                 }
                 if (vneg.y<radius && (vpos.y+vneg.y)>2*radius) {
                     print("Roll: Adjusting spawn pos in +Y");
-                    spawnpos += GetData("RollSensorDirY")*vneg.y; // TODO: epsilon?
+                    spawnpos += GetData("RollSensorDirY")*vneg.y;
                     adjusted = true;
                 }
                 if (vpos.y<radius && (vpos.y+vneg.y)>2*radius) {
                     print("Roll: Adjusting spawn pos in -Y");
-                    spawnpos -= GetData("RollSensorDirY")*vpos.y; // TODO: epsilon?
+                    spawnpos -= GetData("RollSensorDirY")*vpos.y;
                     adjusted = true;
                 }
             }
@@ -356,11 +356,10 @@ class Roll extends SqRootScript
     function OnRollComplete() {
         SetData("IsRolling", FALSE);
 
-        // TODO: transfer remaining velocity to player?
         local remainingVel = message().data;
         print("ROLL COMPLETE. remainingVel:"+remainingVel);
-        // TODO: make sure this goes in the right direction!!
-        //Physics.SetVelocity("Player", vector(-15,0,0));
+        // Transfer remaining velocity to player.
+        Physics.SetVelocity("Player", remainingVel);
 
     }
 
@@ -394,6 +393,11 @@ class Roll extends SqRootScript
         // TODO: distinguish HOW we are getting bashed, i.e.
         //       if source==0 and velocity<(-15? 0?), then it
         //       is fall damage.
+        //       -- rather than use heuristics to decide, save the
+        //          amount and then process it in the PhysCollision
+        //          handler, where we know whether it is the terrain
+        //          we are hitting (and in what direction) or something
+        //          else. and then decide whether to cause damage or roll.
         local timeElapsed = (GetTime()-GetData("PressTime"));
         print("  Roll: Time since last roll press: "+timeElapsed);
         // TODO: tune press window
@@ -546,11 +550,6 @@ class Roll extends SqRootScript
     }
 }
 
-class PlayerRolling extends SqRootScript
-{
-    // TODO: do we still need this metaprop and script?
-}
-
 class RollStuntDouble extends SqRootScript
 {
     DEBUG_NOATTACH = false;
@@ -626,7 +625,6 @@ class RollStuntDouble extends SqRootScript
         link = Link.Create("DetailAttachement", anchor, spinner);
         LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
-        // TODO: offset for head location? this z offset is just me throwing numbers, its not quite the cam offset
         LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
         LinkTools.LinkSetData(link, "rel rot", vector());
 
@@ -647,7 +645,6 @@ class RollStuntDouble extends SqRootScript
     }
 
     function OnRollComplete() {
-        print(message().message);
         local pos;
         local link = Link.GetOne("ScriptParams", self);
         if (link) {
@@ -782,6 +779,7 @@ class RollSensor extends SqRootScript
     }
 }
 
+// TODO: remove
 class DebugSpawnStuntDouble extends SqRootScript
 {
     function OnTurnOn() {
