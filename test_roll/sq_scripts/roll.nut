@@ -29,6 +29,11 @@ class CmdRoll extends SqRootScript
 
 class Roll extends SqRootScript
 {
+    DEBUG_LOG_COLLISIONS = true;
+    DEBUG_LOG_CONTACTS = false;
+
+    ROLL_VELOCITY_BOOST = 20.0;
+
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
 
@@ -39,126 +44,179 @@ class Roll extends SqRootScript
     }
 
     function OnBeginScript() {
+        // TODO: try reading config for ROLL_VELOCITY_BOOST alteration?
+
         if (Object.InheritsFrom(self, "Avatar")
         || self==Object.Named("Player")) {
-            Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg|ePhysScriptMsgType.kContactMsg);
             ActReact.SubscribeToStimulus(self, "BashStim");
-            if (! IsDataSet("PressTime")) {
-                SetData("PressTime", 0.0);
-            }
+            Physics.SubscribeMsg(self,
+                 ePhysScriptMsgType.kCollisionMsg
+                |ePhysScriptMsgType.kContactMsg);
 
-            SetOneShotTimer("DumpFootContacts", 2.0);
+            // Are we currently in a roll.
+            if (! IsDataSet("IsRolling")) SetData("IsRolling", FALSE);
+            // Time roll was pressed (while not grounded).
+            if (! IsDataSet("PressTime")) SetData("PressTime", 0.0);
+            // Time last BashStim came in.
+            if (! IsDataSet("BashTime")) SetData("BashTime", 0.0);
+            // Intensity of last BashStim.
+            if (! IsDataSet("BashIntensity")) SetData("BashIntensity", 0.0);
+
+            // TODO: remove.
+            SetOneShotTimer("DumpGrounded", 2.0);
         }
     }
 
     function OnEndScript() {
         if (Object.InheritsFrom(self, "Avatar")
         || self==Object.Named("Player")) {
-            Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg|ePhysScriptMsgType.kContactMsg);
             ActReact.UnsubscribeToStimulus(self, "BashStim");
+            Physics.UnsubscribeMsg(self,
+                 ePhysScriptMsgType.kCollisionMsg
+                |ePhysScriptMsgType.kContactMsg);
         }
     }
 
+    // TODO: remove
     function DumpVelocity() {
         local vel = vector();
         Physics.GetVelocity(self, vel);
         print("  Z vel:"+vel.z);
     }
 
-    function CheckGrounded() {
-        // Get the foot position
-        local foot_pos = vector();
-        local foot_fac = vector();
-        Object.CalcRelTransform(self, self, foot_pos, foot_fac, 4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
-        foot_pos = Object.ObjectToWorld(self, -foot_pos);
-        print("Our pos:"+Object.Position(self)+" foot_pos:"+foot_pos);
-        // Cast down to see if we hit terrain, OBB, or Sphere/Sphere Hat object
-        local hit_pos = vector();
-        local hit_obj = object();
-        // ARRRGH! Raycast is casting to the *object polygons*, not to the
-        //         physics model! so this is not gonna reliably keep track of
-        //         if we are on the ground or not :(
-        local hit_type = Engine.ObjRaycast(
-            foot_pos+vector(0,0,0.05),
-            foot_pos-vector(0,0,0.05),
-            hit_pos, hit_obj,
-            2 /* return any hit object or terrain */,
-            1 /* ignore mesh objects */,
-            self /* ignore player */, 0);
-        print("  hit type:"+hit_type+" pos:"+hit_pos+" obj:"+hit_obj.tointeger());
-        switch (hit_type) {
-        case 0: // No hit
-        case 3: // Mesh object
-            return FALSE;
-        case 1: // Terrain
-        case 2: // Object
-            return TRUE;
-        }
-    }
-
     function OnCmdRoll() {
         // TODO: check if controls are locked out, e.g. from remote camera or NoMove() script api?
+
         switch (DarkGame.GetPlayerMode()) {
+        // Do a roll if grounded in these modes:
         case ePlayerMode.kPM_Stand:
-        case ePlayerMode.kPM_BodyCarry:
-            print("Stand/Carry: -> crouch.");
-            HandleCrouch(TRUE);
-            break;
+        case ePlayerMode.kPM_BodyCarry: // TODO: allow roll in BodyCarry and force body drop?
         case ePlayerMode.kPM_Crouch:
-            print("Crouch: -> stand up.");
-            HandleCrouch(FALSE);
-            break;
-        case ePlayerMode.kPM_Swim:
-            print("Swim: ignoring crouch.");
-            break;
-        case ePlayerMode.kPM_Climb:
-            print("Climb: ignoring crouch.");
-            // TODO: can we do a detach, if the config is set??
-            print("crouch_unmount: "+Engine.BindingGetFloat("crouch_unmount"));
-            // this is not sufficient to force a detach:
-            //     DarkGame.PlayerMode(ePlayerMode.kPM_Stand);
-            // this might be useful:
-            //     Physics.GetClimbingObject(object climber, object & climbobj);
-            break;
-        case ePlayerMode.kPM_Slide:
-            print("Slide: ignoring crouch.");
-            break;
         case ePlayerMode.kPM_Jump:
-            print("Jump: treat as -> stand up.");
-            HandleCrouch(FALSE);
+            // NOTE: After mantling a Sphere Hat object, you often remain in
+            //       Jump mode, which is (at least partly) why you cant crouch
+            //       until you move enough to step and go back to Stand mode.
+            print("Stand/BodyCarry/Crouch/Jump: -> roll (if grounded).");
+            HandleCmdRoll();
             break;
+
+        // Do nothing for other modes:
+        case ePlayerMode.kPM_Swim:
+        case ePlayerMode.kPM_Climb:
+        case ePlayerMode.kPM_Slide:
         case ePlayerMode.kPM_Dead:
-            // Do nothing.
-            print("Dead: ignoring crouch.");
+            print("Swim/Climb/Slide/Dead: ignoring roll.");
             break;
         }
     }
 
-    function HandleCrouch(crouch) {
-        local isOnGround = CheckGrounded();
-        print("  isOnGround:"+isOnGround);
-        DumpVelocity();
+    function HandleCmdRoll() {
+        // TEMP: experimenting with midair rolls?
+        if (TRUE|| IsGrounded()) {
+            // Do a roll now.
 
-        if (isOnGround) {
-            print("  crouch: "+crouch);
-            DarkGame.PlayerMode(crouch? ePlayerMode.kPM_Crouch : ePlayerMode.kPM_Stand);
+            // Get both our XY velocity and XY forward vector.
+            local vel = vector();
+            Physics.GetVelocity(self, vel);
+            local fallVelocity = vel.z;
+            vel.z = 0.0;
+            local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
+            forward.z = 0.0;
+            forward.Normalize();
+
+            // TODO: probably use z velocity to distinguish between a fall and
+            //       a jump, and only allow a midair roll from lowish z velocities;
+            //       high z velocities should instead trigger a roll on landing.
+
+            // Boost velocity so we can roll from standing, or roll much
+            // farther while running.
+            print("vel mag:"+vel.Length());
+            local boost = ROLL_VELOCITY_BOOST;
+            if (IsGrounded()) {
+            } else {
+                // TODO: falling velocity conversion?
+                // Reduce boost if rolling in midair (no ground to push off)
+                boost *= 0.5;
+            }
+            vel += (forward*boost)
+            print("boost mag:"+vel.Length());
+
+            DoRoll(vel);
         } else {
+            // If we land imminently, we will do a roll then.
             SetData("PressTime", GetTime());
+            DumpVelocity();
         }
+    }
+
+    function DoRoll(velocity) {
+        if (GetData("IsRolling")) return;
+        // Doing a roll is too dangerous for the player, so we have a stunt
+        // double do it. (We can't actually manage the player's physics nor
+        // camera adequately, hence this fakery.)
+        local o = Object.Create("StuntDouble");
+
+        // If we start the stunt double exactly at our origin, it hits belly-
+        // high objects that we _could_ roll under if we are too close to them
+        // when starting the roll. So we start the stunt double from a point
+        // relative to our foot instead (so its stance-independent). We add
+        // a tiny bit of extra z clearance in case the foot is just under
+        // something.
+        local relpos = vector();
+        local relfac = vector();
+        Object.CalcRelTransform(self, self, relpos, relfac,
+            4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
+        local footpos = Object.ObjectToWorld(self, -relpos);
+        local radius = Property.Get(o, "PhysDims", "Radius 1");
+        local spawnpos = footpos+vector(0,0,radius+0.05);
+        local spawnfac = Object.Facing(self);
+        Object.Teleport(o, spawnpos, spawnfac, 0);
+        // BUG: Physics.ValidPos() does not check against objects, so will allow
+        //      rolling through doors!
+        // BUG: Teleporting the player does not break contacts, so if the player
+        //      is pressed up against an object, then rolls, the physic engine
+        //      still thinks theyre pressed up against it after the telport,
+        //      and they cant then walk in that direction. VERY BAD!!!!!!
+        if (Physics.ValidPos(o)) {
+            Physics.ControlCurrentRotation(o);
+            Physics.SetVelocity(o, velocity);
+            print("ROLL BEGIN. velocity:"+velocity);
+            SetData("IsRolling", TRUE);
+            SendMessage(o, "RollBegin");
+        } else {
+            print("Invalid position for StuntDouble; aborting roll.");
+            Sound.PlaySchema(0, "gardrop");
+            Object.Destroy(o);
+        }
+    }
+
+    function OnRollComplete() {
+        SetData("IsRolling", FALSE);
+
+        // TODO: transfer remaining velocity to player?
+        local remainingVel = message().data;
+        print("ROLL COMPLETE. remainingVel:"+remainingVel);
+        // TODO: make sure this goes in the right direction!!
+        //Physics.SetVelocity("Player", vector(-15,0,0));
+
     }
 
     function OnTimer() {
-        if (message().name=="DumpFootContacts") {
-            print(": contacts:"+HasFootContacts()+" terrainOnly:"+HasFootContacts(true));
-            print("    Foot:");
-            foreach (key,value in m_footContacts) {
-                print("      "+key+":"+value);
+        if (message().name=="DumpGrounded") {
+            local isGrounded = IsGrounded();
+            local isTerrainOnly = IsGrounded(true);
+            print(": grounded: "+(isTerrainOnly? "TERRAIN" : isGrounded? "OBJECT" : "-"));
+            if (DEBUG_LOG_CONTACTS) {
+                print("    Foot:");
+                foreach (key,value in m_footContacts) {
+                    print("      "+key+":"+value);
+                }
+                print("    Shin:");
+                foreach (key,value in m_shinContacts) {
+                    print("      "+key+":"+value);
+                }
             }
-            print("    Shin:");
-            foreach (key,value in m_shinContacts) {
-                print("      "+key+":"+value);
-            }
-            SetOneShotTimer("DumpFootContacts", 2.0);
+            SetOneShotTimer("DumpGrounded", 2.0);
         }
     }
 
@@ -197,28 +255,35 @@ class Roll extends SqRootScript
     }
 
     function OnPhysCollision() {
-        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
-            local typeString = "unknown";
-            switch(message().collType) {
-            case ePhysCollisionType.kCollNone: typeString = "none"; break;
-            case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
-            case ePhysCollisionType.kCollObject: typeString = "object"; break;
+        if (DEBUG_LOG_COLLISIONS) {
+            if (message().Submod==1  // PLAYER_FOOT
+            ||message().Submod==3    // PLAYER_KNEE
+            ||message().Submod==4) { // PLAYER_SHIN
+                local typeString = "unknown";
+                switch(message().collType) {
+                case ePhysCollisionType.kCollNone: typeString = "none"; break;
+                case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
+                case ePhysCollisionType.kCollObject: typeString = "object"; break;
+                }
+                print(message().message
+                    +" bodypart:"+message().Submod
+                    +" time:"+GetTime()
+                    +" type:"+typeString
+                    +" obj:"+desc(message().collObj)
+                    +" submod:"+message().collSubmod
+                    +" momentum:"+message().collMomentum
+                    +" normal.z:"+message().collNormal.z
+                    +" pos:"+message().collPt);
             }
-            print(message().message
-                +" bodypart:"+message().Submod
-                +" time:"+GetTime()
-                +" type:"+typeString
-                +" obj:"+desc(message().collObj)
-                +" submod:"+message().collSubmod
-                +" momentum:"+message().collMomentum
-                +" normal.z:"+message().collNormal.z
-                +" pos:"+message().collPt);
         }
     }
 
     function TrackFootContact(createContact) {
-        // Track terrain face / object contacts. CAll this only from
+        // Track terrain face / object contacts. Call this only from
         // PhysContactCreate/PhysContactDestroy handlers.
+        // We need to track the shin as well as the foot, because when mantling
+        // onto sphere hat objects, sometimes it is only the shin that is in
+        // contact with the object (even when you can do the crouch dance).
         local isFoot = (message().Submod==1); // PLAYER_FOOT
         local isShin = (message().Submod==4); // PLAYER_SHIN
         if (! isFoot && ! isShin) return;
@@ -254,9 +319,9 @@ class Roll extends SqRootScript
         }
     }
 
-    function HasFootContacts(terrainOnly=false) {
+    function IsGrounded(terrainOnly=false) {
         local terrainContacts = (m_footContacts.rawget("terrain")>0);
-        local otherContacts = (m_footContacts.len()>1) || (m_shinContacts.len()>1);
+        local otherContacts = (m_footContacts.len()>1) || (m_shinContacts.len()>0);
         if (terrainOnly)
             return terrainContacts;
         else
@@ -264,47 +329,57 @@ class Roll extends SqRootScript
     }
 
     function OnPhysContactCreate() {
-        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
-            local typeString = "unknown";
-            switch (message().contactType) {
-            case ePhysContactType.kContactNone: typeString = "none"; break;
-            case ePhysContactType.kContactFace: typeString = "face"; break;
-            case ePhysContactType.kContactEdge: typeString = "edge"; break;
-            case ePhysContactType.kContactVertex: typeString = "vertex"; break;
-            case ePhysContactType.kContactSphere: typeString = "sphere"; break;
-            case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
-            case ePhysContactType.kContactOBB: typeString = "obb"; break;
-            }
-            print(message().message
-                +" bodypart:"+message().Submod
-                +" time:"+GetTime()
-                +" type:"+typeString
-                +" obj:"+desc(message().contactObj)
-                +" submod:"+message().contactSubmod);
-        }
         TrackFootContact(true);
+
+        if (DEBUG_LOG_CONTACTS) {
+            if (message().Submod==1  // PLAYER_FOOT
+            ||message().Submod==3    // PLAYER_KNEE
+            ||message().Submod==4) { // PLAYER_SHIN
+                local typeString = "unknown";
+                switch (message().contactType) {
+                case ePhysContactType.kContactNone: typeString = "none"; break;
+                case ePhysContactType.kContactFace: typeString = "face"; break;
+                case ePhysContactType.kContactEdge: typeString = "edge"; break;
+                case ePhysContactType.kContactVertex: typeString = "vertex"; break;
+                case ePhysContactType.kContactSphere: typeString = "sphere"; break;
+                case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
+                case ePhysContactType.kContactOBB: typeString = "obb"; break;
+                }
+                print(message().message
+                    +" bodypart:"+message().Submod
+                    +" time:"+GetTime()
+                    +" type:"+typeString
+                    +" obj:"+desc(message().contactObj)
+                    +" submod:"+message().contactSubmod);
+            }
+        }
     }
 
     function OnPhysContactDestroy() {
-        if (message().Submod==1||message().Submod==3||message().Submod==4) { // PLAYER_FOOT, PLAYER_KNEE, PLAYER_SHIN
-            local typeString = "unknown";
-            switch (message().contactType) {
-            case ePhysContactType.kContactNone: typeString = "none"; break;
-            case ePhysContactType.kContactFace: typeString = "face"; break;
-            case ePhysContactType.kContactEdge: typeString = "edge"; break;
-            case ePhysContactType.kContactVertex: typeString = "vertex"; break;
-            case ePhysContactType.kContactSphere: typeString = "sphere"; break;
-            case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
-            case ePhysContactType.kContactOBB: typeString = "obb"; break;
-            }
-            print(message().message
-                +" bodypart:"+message().Submod
-                +" time:"+GetTime()
-                +" type:"+typeString
-                +" obj:"+desc(message().contactObj)
-                +" submod:"+message().contactSubmod);
-        }
         TrackFootContact(false);
+
+        if (DEBUG_LOG_CONTACTS) {
+            if (message().Submod==1  // PLAYER_FOOT
+            ||message().Submod==3    // PLAYER_KNEE
+            ||message().Submod==4) { // PLAYER_SHIN
+                local typeString = "unknown";
+                switch (message().contactType) {
+                case ePhysContactType.kContactNone: typeString = "none"; break;
+                case ePhysContactType.kContactFace: typeString = "face"; break;
+                case ePhysContactType.kContactEdge: typeString = "edge"; break;
+                case ePhysContactType.kContactVertex: typeString = "vertex"; break;
+                case ePhysContactType.kContactSphere: typeString = "sphere"; break;
+                case ePhysContactType.kContactSphereHat: typeString = "spherehat"; break;
+                case ePhysContactType.kContactOBB: typeString = "obb"; break;
+                }
+                print(message().message
+                    +" bodypart:"+message().Submod
+                    +" time:"+GetTime()
+                    +" type:"+typeString
+                    +" obj:"+desc(message().contactObj)
+                    +" submod:"+message().contactSubmod);
+            }
+        }
     }
 }
 
@@ -328,7 +403,7 @@ class RollStuntDouble extends SqRootScript
             Property.SetSimple(self, "RenderType", 1); // Not Rendered
     }
 
-    function OnCreate() {
+    function OnRollBegin() {
         if (! DEBUG_NOTELEPORT) {
             DarkGame.PlayerMode(ePlayerMode.kPM_Crouch);
             DarkGame.NoMove(true);
@@ -401,11 +476,7 @@ class RollStuntDouble extends SqRootScript
             // Hack, in case anchor is gone, to keep player out of the ground.
             pos = Object.Position(self)+vector(0,0,2);
         }
-        local fac = Object.Facing("Player");
-        // TODO: transfer remaining velocity to player.
-        // TODO: make sure this goes in the right direction!!
-        Physics.SetVelocity("Player", vector(-15,0,0));
-
+        local fac = Object.Facing("Player"); // TODO: self?
         if (! DEBUG_NOTELEPORT) {
             // TODO: set position instead of teleport so as not to break awareness.
             Object.Teleport("Player", pos, fac, 0);
@@ -415,6 +486,11 @@ class RollStuntDouble extends SqRootScript
         }
         if (! DEBUG_NOATTACH)
             Camera.ForceCameraReturn();
+
+        local vel = vector();
+        Physics.GetVelocity(self, vel);
+        SendMessage("Player", "RollComplete", vel);
+
         if (! DEBUG_NODESTROY)
             Object.Destroy(self);
     }
@@ -423,19 +499,13 @@ class RollStuntDouble extends SqRootScript
 class RollSpinner extends SqRootScript
 {
     function OnSlain() {
-        print("RollSpinner: "+message().message);
         foreach (link in Link.GetAll("~ScriptParams")) {
             if (LinkTools.LinkGetData(link, "")=="StuntDouble") {
-                print("Found stunt double: "+LinkDest(link));
                 SendMessage(LinkDest(link), "RollComplete");
                 return;
             }
         }
-        print("Did not find stunt double ;_;");
-    }
-
-    function OnMessage() {
-        print("RollSpinner: "+message().message);
+        print("ERROR: Did not find stunt double ;_;");
     }
 }
 
