@@ -29,10 +29,13 @@ class CmdRoll extends SqRootScript
 
 class Roll extends SqRootScript
 {
-    DEBUG_LOG_COLLISIONS = true;
-    DEBUG_LOG_CONTACTS = false;
+    static DEBUG_LOG_COLLISIONS = false;
+    static DEBUG_LOG_CONTACTS = false;
+    static DEBUG_LOG_SENSORS = true;
+    static DEBUG_LOG_GROUNDED = false;
 
-    ROLL_VELOCITY_BOOST = 20.0;
+    static ROLL_VELOCITY_BOOST = 20.0;
+    static ROLL_SENSOR_RADIUS = 0.25;
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
@@ -62,8 +65,7 @@ class Roll extends SqRootScript
             // Intensity of last BashStim.
             if (! IsDataSet("BashIntensity")) SetData("BashIntensity", 0.0);
 
-            // TODO: remove.
-            SetOneShotTimer("DumpGrounded", 2.0);
+            if (DEBUG_LOG_GROUNDED) SetOneShotTimer("DumpGrounded", 2.0);
         }
     }
 
@@ -151,10 +153,25 @@ class Roll extends SqRootScript
 
     function DoRoll(velocity) {
         if (GetData("IsRolling")) return;
+
+        // TEMP: launch sensors, see how those work. do nothing else yet.
+        local pos = Object.Position(self);
+        // Disable collision on the player so the sensors don't collide with us.
+        Property.SetSimple("Player", "CollisionType", 0);
+        // TODO: make sure we restore player collision afterwards!!
+        SpawnSensor(pos, vector(-1,0,0), "x-");
+        SpawnSensor(pos, vector( 1,0,0), "x+");
+        SpawnSensor(pos, vector(0,-1,0), "y-");
+        SpawnSensor(pos, vector(0, 1,0), "y+");
+        SpawnSensor(pos, vector(0,0,-1), "z-");
+        SpawnSensor(pos, vector(0,0, 1), "z+");
+        PostMessage(self, "RollSensorWait");
+        return;
+
+
         // Doing a roll is too dangerous for the player, so we have a stunt
         // double do it. (We can't actually manage the player's physics nor
         // camera adequately, hence this fakery.)
-        local o = Object.Create("StuntDouble");
 
         // If we start the stunt double exactly at our origin, it hits belly-
         // high objects that we _could_ roll under if we are too close to them
@@ -171,15 +188,20 @@ class Roll extends SqRootScript
         //       (which means the player facing we restore to will not always
         //       be the same direction as the roll velocity).
 
+        local arch = Object.Named("StuntDouble");
+
         local relpos = vector();
         local relfac = vector();
         Object.CalcRelTransform(self, self, relpos, relfac,
             4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
         local footpos = Object.ObjectToWorld(self, -relpos);
-        local radius = Property.Get(o, "PhysDims", "Radius 1");
+        local radius = Property.Get(arch, "PhysDims", "Radius 1");
         local spawnpos = footpos+vector(0,0,radius+0.05);
         local spawnfac = Object.Facing(self);
+        
+        local o = Object.BeginCreate(arch)
         Object.Teleport(o, spawnpos, spawnfac, 0);
+        Object.EndCreate(o);
         // BUG: Physics.ValidPos() does not check against objects, so will allow
         //      rolling through doors!
         if (Physics.ValidPos(o)) {
@@ -260,7 +282,7 @@ class Roll extends SqRootScript
     }
 
     function OnPhysCollision() {
-        if (DEBUG_LOG_COLLISIONS) {
+        if (Roll.DEBUG_LOG_COLLISIONS) {
             if (message().Submod==1  // PLAYER_FOOT
             ||message().Submod==3    // PLAYER_KNEE
             ||message().Submod==4) { // PLAYER_SHIN
@@ -385,6 +407,44 @@ class Roll extends SqRootScript
                     +" submod:"+message().contactSubmod);
             }
         }
+    }
+
+    function SpawnSensor(pos, dir, name) {
+        dir = Object.ObjectToWorld(self, dir) - Object.Position(self);
+        print("dir: "+dir);
+        local sensorVelocity = 1000.0;
+        name = "RollSensor "+name;
+        local sensor = Object.BeginCreate("object")
+        try {
+            Object.SetName(sensor, name);
+            Object.Teleport(sensor, pos, vector(), 0);
+            Property.Set(sensor, "Scripts", "Script 0", "RollSensor");
+        } catch(e) {}
+        Object.EndCreate(sensor);
+        Physics.SetVelocity(sensor, dir*sensorVelocity);
+    }
+
+    function OnRollSensorHit() {
+        local collDist = message().data;
+        //local collObj = message().data2;
+        //local collNorm = message().data3;
+
+        print(message().message
+            +" from:"+desc(message().from)
+            +" dist:"+collDist);
+    }
+
+    function OnRollSensorWait() {
+        print(message().message
+            +" time:"+GetTime());
+        // Have to wait another frame for the reports to come in :(
+        PostMessage(self, "RollSensorFollowUp");
+    }
+
+    function OnRollSensorFollowUp() {
+        print(message().message
+            +" time:"+GetTime()
+            +" -------------------------------------------------------------");
     }
 }
 
@@ -534,11 +594,90 @@ class RollSpinner extends SqRootScript
     }
 }
 
+class RollSensor extends SqRootScript
+{
+    function OnCreate() {
+        SetProperty("PhysType", "Type", 1); // Sphere
+        SetProperty("PhysType", "# Submodels", 1);
+        SetProperty("PhysDims", "Radius 1", Roll.ROLL_SENSOR_RADIUS);
+        SetProperty("PhysDims", "Offset 1", 0.0);
+        SetProperty("PhysAttr", "Gravity %", 0.0);
+        SetProperty("PhysAttr", "Mass", 0.0);
+        SetProperty("CollisionType", 0x3); // Bounce|Destroy On Impact
+        SetProperty("BashFactor", 0.0); // Don't cause any impact damage.
+        // Self destruct if we dont collide pretty quickly:
+        SetProperty("CfgTweqDelete", "Halt", TWEQ_HALT_SLAY);
+        SetProperty("CfgTweqDelete", "AnimC", TWEQ_AC_SIM);
+        SetProperty("CfgTweqDelete", "Misc", 0);
+        SetProperty("CfgTweqDelete", "CurveC", 0);
+        SetProperty("CfgTweqDelete", "Rate", 125);
+        SetProperty("StTweqDelete", "AnimS", TWEQ_AS_ONOFF);
+
+        SetData("StartTime", GetTime());
+        SetData("StartPos", Object.Position(self));
+    }
+
+    function OnBeginScript() {
+        Physics.SubscribeMsg(self,
+             ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self,
+             ePhysScriptMsgType.kCollisionMsg);
+    }
+
+    function OnPhysCollision() {
+        // NOTE: message().collPt is a lie when an OBB is hit at high speed (and
+        //       maybe also other object types). So we can't use it to get
+        //       accurate distance to collision point. However, our object
+        //       position at the time of collision is good enough: it will be
+        //       a slight underestimate (even after adding in our radius), but
+        //       underestimating is safe for our spawn "enough room?" checks.
+        local collPos = Object.Position(self);
+        local fromTime = GetData("StartTime");
+        local fromPos = GetData("StartPos");
+        local dist = (collPos-fromPos).Length()+Roll.ROLL_SENSOR_RADIUS;
+
+        if (Roll.DEBUG_LOG_SENSORS) {
+            local typeString = "unknown";
+            switch(message().collType) {
+            case ePhysCollisionType.kCollNone: typeString = "none"; break;
+            case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
+            case ePhysCollisionType.kCollObject: typeString = "object"; break;
+            }
+            print(desc(self)+" "+message().message
+                +" elapsed:"+(GetTime()-fromTime)
+                +" type:"+typeString
+                +" obj:"+desc(message().collObj)
+                //+" fromPos:"+fromPos
+                +" pos:"+collPos
+                +" dist:"+dist);
+        }
+
+        SendMessage("Player", "RollSensorHit",
+            dist,
+            (message().collObj).tointeger(),
+            message().collNormal);
+        //Object.Destroy(self);
+        Reply(ePhysMessageResult.kPM_StatusQuo);
+    }
+
+    function OnSlain() {
+        if (Roll.DEBUG_LOG_SENSORS) {
+            print(desc(self)+" "+message().message
+                +" time:"+GetTime()
+                +" with no collisions.");
+        }
+    }
+}
+
 class DebugSpawnStuntDouble extends SqRootScript
 {
     function OnTurnOn() {
-        local o = Object.Create("StuntDouble");
+        local o = Object.BeginCreate("StuntDouble");
         Object.Teleport(o, vector(), vector(), self);
+        Object.EndCreate(o);
         //Property.Set(o, "PhysState", "Rot Velocity", vector(0,-8,0));
         Physics.ControlCurrentRotation(o);
         // TODO: make sure this goes in the right direction!!
