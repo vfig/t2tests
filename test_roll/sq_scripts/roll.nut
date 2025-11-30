@@ -22,16 +22,28 @@ class Roll extends SqRootScript
 {
     static DEBUG_LOG_COLLISIONS = false;
     static DEBUG_LOG_CONTACTS = false;
-    static DEBUG_LOG_SENSORS = false;
+    static DEBUG_LOG_SENSORS = true;
+    static DEBUG_SENSORS_STAY = true;
     static DEBUG_LOG_GROUNDED = false;
+    static DEBUG_LOG_VELOCITY = false;
 
-    static ROLL_VELOCITY_BOOST = 20.0;
-    static ROLL_MINIMUM_FORWARD_SPACE = 6.0;
+    static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
+    static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
+    static ROLL_PRELANDING_WINDOW = 0.2;        // Start of window for pressing roll pre-landing.
+    static ROLL_DAMAGE_REDUCTION = 6.0;         // How much a roll subtracts from incoming fall damage.
+    static ROLL_MINIMUM_FORWARD_SPACE = 6.0;    // Can't roll forward with less space than this.
     static ROLL_SENSOR_RADIUS = 0.25;
     static ROLL_CAMERA_OFFSETZ = 1.25;
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
+
+    // Keep track of who bashed us for assigning damage blame in PhysCollision.
+    // The PhysCollision message should always come in on the same frame, so
+    // no need to preserve this over save/load.
+    m_bashDeferred = false;
+    m_bashTime = 0.0;
+    m_bashIntensity = 0.0;
 
     constructor() {
         m_footContacts = {};
@@ -62,13 +74,9 @@ class Roll extends SqRootScript
             if (! IsDataSet("RollSensorDirY")) SetData("RollSensorDirY", vector());
             // Whether to cancel an imminent roll.
             if (! IsDataSet("CancelRoll")) SetData("CancelRoll", FALSE);
-            // Time last BashStim came in.
-            if (! IsDataSet("BashTime")) SetData("BashTime", 0.0);
-            // Intensity of last BashStim.
-            if (! IsDataSet("BashIntensity")) SetData("BashIntensity", 0.0);
 
-
-            if (DEBUG_LOG_GROUNDED) SetOneShotTimer("DumpGrounded", 2.0);
+            if (DEBUG_LOG_GROUNDED) SetOneShotTimer("DumpGrounded", 0.1);
+            if (DEBUG_LOG_VELOCITY) SetOneShotTimer("DumpVelocity", 0.1);
         }
     }
 
@@ -123,42 +131,52 @@ class Roll extends SqRootScript
     function HandleCmdRoll() {
         if (GetData("IsRolling")) return;
 
-        // TEMP: experimenting with midair rolls?
-        if (TRUE|| IsGrounded()) {
-            // Do a roll now.
+        print("---- roll pressed ----");
 
-            // Get both our XY velocity and XY forward vector.
-            local vel = vector();
-            Physics.GetVelocity(self, vel);
-            local fallVelocity = vel.z;
-            vel.z = 0.0;
+
+        if (DEBUG_LOG_VELOCITY) {
+            print("---- roll goes here ----");
+            return;
+        }
+
+        local isGrounded = IsGrounded();
+        // Separate XY and Z velocity components.
+        local velxy = vector();
+        Physics.GetVelocity(self, velxy);
+        local velz = velxy.z;
+        velxy.z = 0.0;
+
+        if (true) { // TODO:TEMP: if (isGrounded || velz>=ROLL_MIDAIR_VELOCITY_CUTOFF) {
+            // Grounded or not falling fast: do a roll now.
+
+            // Get XY forward vector.
             local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
             forward.z = 0.0;
             forward.Normalize();
 
-            // TODO: probably use z velocity to distinguish between a fall and
-            //       a jump, and only allow a midair roll from lowish z velocities;
-            //       high z velocities should instead trigger a roll on landing.
-
             // Boost velocity so we can roll from standing, or roll much
             // farther while running.
-            print("Roll: vel mag:"+vel.Length());
+            print("Roll: velxy mag:"+velxy.Length());
             local boost = ROLL_VELOCITY_BOOST;
-            if (IsGrounded()) {
-            } else {
-                // TODO: falling velocity conversion?
+            if (! isGrounded) {
                 // Reduce boost if rolling in midair (no ground to push off)
                 boost *= 0.5;
             }
-            vel += (forward*boost)
-            print("Roll: boost mag:"+vel.Length());
+            velxy += (forward*boost)
+            print("Roll: boost mag:"+velxy.Length());
 
-            local fromFootLevel = IsGrounded();
-            DoRoll(vel, fromFootLevel);
+            local fromFootLevel = isGrounded;
+            DoRoll(velxy, fromFootLevel);
         } else {
             // If we land imminently, we will do a roll then.
             SetData("PressTime", GetTime());
             DumpVelocity();
+
+            // TODO: maybe need to distinguish this from actually getting a bash?
+            m_bashDeferred = true;
+            m_bashTime = GetTime();
+            m_bashIntensity = 0.0;
+
         }
     }
 
@@ -221,12 +239,20 @@ class Roll extends SqRootScript
     }
 
     function SpawnSensor(pos, localDir, worldDir, name) {
+        if (DEBUG_LOG_SENSORS) {
+            print("Spawning sensor at:"+pos
+                +" dir:"+localDir
+                +" worldDir:"+worldDir
+                +" name:"+name);
+        }
         local sensorVelocity = 1000.0;
         name = "RollSensor "+name;
         local sensor = Object.BeginCreate("object")
         try {
             Object.SetName(sensor, name);
             Object.Teleport(sensor, pos, vector(), 0);
+            Property.SetSimple(sensor, "ModelName", "unitsfer");
+            Property.SetSimple(sensor, "Scale", vector(0.25,0.25,0.25));
             Property.Set(sensor, "Scripts", "Script 0", "RollSensor");
         } catch(e) {}
         Object.EndCreate(sensor);
@@ -366,7 +392,8 @@ class Roll extends SqRootScript
     }
 
     function OnTimer() {
-        if (message().name=="DumpGrounded") {
+        switch (message().name) {
+        case "DumpGrounded":
             local isGrounded = IsGrounded();
             local isTerrainOnly = IsGrounded(true);
             print(": grounded: "+(isTerrainOnly? "TERRAIN" : isGrounded? "OBJECT" : "-"));
@@ -381,45 +408,44 @@ class Roll extends SqRootScript
                 }
             }
             SetOneShotTimer("DumpGrounded", 2.0);
+            break;
+        case "DumpVelocity":
+            DumpVelocity();
+            SetOneShotTimer("DumpVelocity", 0.017);
+            break;
         }
     }
 
     function OnBashStimStimulus() {
+
+        // TODO: check downward and upward squishes to see if they are ambiguous
+        //       (z velocity might help disambiguate)
         print("BashStim"
             +" time:"+GetTime()
             +" intensity:"+message().intensity
             +" sensor:"+message().sensor
-            +" source:"+desc(message().source));
+            +" source:"+message().source);
+        print("BashStim.sensor from:"+desc(LinkSource(message().sensor))+" to:"+desc(LinkDest(message().sensor)));
+        print("BashStim.source from:"+desc(LinkSource(message().source))+" to:"+desc(LinkDest(message().source)));
+
         DumpVelocity();
 
-        // TODO: distinguish HOW we are getting bashed, i.e.
-        //       if source==0 and velocity<(-15? 0?), then it
-        //       is fall damage.
-        //       -- rather than use heuristics to decide, save the
-        //          amount and then process it in the PhysCollision
-        //          handler, where we know whether it is the terrain
-        //          we are hitting (and in what direction) or something
-        //          else. and then decide whether to cause damage or roll.
-        local timeElapsed = (GetTime()-GetData("PressTime"));
-        print("  Roll: Time since last roll press: "+timeElapsed);
-        // TODO: tune press window
-        // TODO: maybe allow slight window after hitting ground?
-        if (0.0<=timeElapsed && timeElapsed<=0.2) {
-            print("  ************ roll ************");
-            // TODO: do a roll
-        } else {
-            // TODO: stochastic round?
-            local damage = floor(message().intensity+0.5);
-            Damage.Damage(self, 0, damage, (message().stimulus).tointeger());
-        }
-    }
+        if (message().source==0) {
+            // Physics bash.
 
-    function OnDamage() {
-        print("Damage"
-            +" time:"+GetTime()
-            +" kind:"+message().kind
-            +" damage:"+message().damage
-            +" culprit:"+message().culprit);
+            // We can't tell yet whether the bash is from an object hitting us
+            // or the ground hiting us. We save the crucial details so we can
+            // decide whether to apply damage or not when the PhysCollision happens.
+            m_bashDeferred = true;
+            m_bashTime = GetTime();
+            m_bashIntensity = message().intensity;
+        } else {
+            // Stim bash. Damage immediately, don't defer it to PhysCollision.
+            m_bashDeferred = false;
+            local s = sLink(message().source);
+            local culprit = s.source;
+            ApplyBashStimDamage(message().intensity, culprit);
+        }
     }
 
     function OnPhysCollision() {
@@ -444,6 +470,85 @@ class Roll extends SqRootScript
                     +" pos:"+message().collPt);
             }
         }
+
+        if (m_bashDeferred) {
+            m_bashDeferred = false;
+
+
+            // Sanity check the elapsed time since the BashStim
+            local elapsedTime = (GetTime()-m_bashTime);
+            if (elapsedTime>0) {
+                print("*****************************************************************");
+                print("*****************************************************************");
+                print("*****************************************************************");
+                print("*****************************************************************");
+                print("*****************************************************************");
+                print("*****************************************************************");
+                print("************* ERROR: Nonzero deferred bash time:"+elapsedTime+" *************");
+            }
+
+            local canRoll = false;
+
+            // Check if player wanted to roll.
+            local elapsedTime = (GetTime()-GetData("PressTime"));
+            print("  Roll: Time since last roll press: "+elapsedTime);
+            // TODO: tune press window
+            // TODO: maybe allow slight window after hitting ground?
+            
+            // TODO:TEMP:
+            //if (0.0<=elapsedTime && elapsedTime<=ROLL_PRELANDING_WINDOW) {
+                canRoll = true;
+            //}
+
+            // Check if we are hitting something downward.
+            if (message().collNormal.z<=0.0)
+                canRoll = false;
+
+            if (canRoll) {
+                print("  ************ roll ************");
+                // Reduce incoming damage.
+                ApplyBashStimDamage(m_bashIntensity-ROLL_DAMAGE_REDUCTION, 0);
+
+                // Do a roll!
+
+                // Separate XY and Z velocity components.
+                local velxy = vector();
+                Physics.GetVelocity(self, velxy);
+                local velz = velxy.z;
+                velxy.z = 0.0;
+                // Get XY forward vector.
+                local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
+                forward.z = 0.0;
+                forward.Normalize();
+                // Convert z velocity into roll velocity.
+                print("Roll: velz:"+velz);
+                print("Roll: velxy mag:"+velxy.Length());
+                local boost = fabs(velz); // TODO: maybe a factor to tune how much gets converted?
+                velxy += (forward*boost)
+                print("Roll: boost mag:"+velxy.Length());
+
+                DoRoll(velxy, false);
+            } else {
+                ApplyBashStimDamage(m_bashIntensity, 0);
+            }
+        }
+    }
+
+    function ApplyBashStimDamage(intensity, culprit) {
+        // Stochastically round damage amount, same as in DMGREACT.CPP:damage_func()
+        local damage = floor(intensity + (Data.RandInt(0,99)/100.0));
+        if (damage>0) {
+            local stim = Object.Named("BashStim");
+            Damage.Damage(self, culprit, damage, stim.tointeger());
+        }
+    }
+
+    function OnDamage() {
+        print("Damage"
+            +" time:"+GetTime()
+            +" kind:"+message().kind
+            +" damage:"+message().damage
+            +" culprit:"+message().culprit);
     }
 
     function TrackFootContact(createContact) {
@@ -712,16 +817,23 @@ class RollSensor extends SqRootScript
         SetProperty("PhysDims", "Offset 1", 0.0);
         SetProperty("PhysAttr", "Gravity %", 0.0);
         SetProperty("PhysAttr", "Mass", 0.0);
-        SetProperty("CollisionType", 0x3); // Bounce|Destroy On Impact
+        if (Roll.DEBUG_SENSORS_STAY) {
+            SetProperty("CollisionType", 0x1); // Bounce.
+            SetProperty("RenderType", 2); // Unlit.
+        } else {
+            SetProperty("CollisionType", 0x3); // Bounce|Destroy On Impact
+            SetProperty("RenderType", 1); // Not Rendered.
+        }
         SetProperty("BashFactor", 0.0); // Don't cause any impact damage.
-        SetProperty("RenderType", 1); // Not Rendered.
         // Self destruct if we dont collide pretty quickly:
         SetProperty("CfgTweqDelete", "Halt", TWEQ_HALT_SLAY);
         SetProperty("CfgTweqDelete", "AnimC", TWEQ_AC_SIM);
         SetProperty("CfgTweqDelete", "Misc", 0);
         SetProperty("CfgTweqDelete", "CurveC", 0);
         SetProperty("CfgTweqDelete", "Rate", 67);
-        SetProperty("StTweqDelete", "AnimS", TWEQ_AS_ONOFF);
+        if (! Roll.DEBUG_SENSORS_STAY) {
+            SetProperty("StTweqDelete", "AnimS", TWEQ_AS_ONOFF);
+        }
 
         SetData("StartTime", GetTime());
         SetData("StartPos", Object.Position(self));
@@ -770,6 +882,10 @@ class RollSensor extends SqRootScript
                 +" obj:"+objString
                 +" pos:"+collPos
                 +" dist:"+dist);
+        }
+
+        if (Roll.DEBUG_SENSORS_STAY) {
+            Physics.SetVelocity(self, vector());
         }
 
         local direction = (IsDataSet("Direction")? GetData("Direction") : vector());
