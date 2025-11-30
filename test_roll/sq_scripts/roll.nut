@@ -333,7 +333,9 @@ class Roll extends SqRootScript
         local spawnfac = Object.Facing(self);
         
         local o = Object.BeginCreate(arch)
-        Object.Teleport(o, spawnpos, spawnfac, 0);
+        try {
+            Object.Teleport(o, spawnpos, spawnfac, 0);
+        } catch(e) {}
         Object.EndCreate(o);
         // NOTE: Physics.ValidPos() does not check against objects, so will allow
         //       rolling through doors. We have the whole sensor rigmarole above
@@ -592,11 +594,15 @@ class RollStuntDouble extends SqRootScript
         //       it again, its just a default 1 big sphere, not the correct 5 submodels.
         Property.SetSimple("Player", "CollisionType", 0); // None
 
-        local spinner = Object.Create("fnord");
-        Property.SetSimple(spinner, "ModelName", "axisjoints"); // has rotary joint
+        local spinner = Object.BeginCreate("fnord");
+        try {
+            Property.SetSimple(spinner, "ModelName", "axisjoints"); // has rotary joint
+            Object.Teleport(spinner, vector(), vector(), self);
+            Property.Set(spinner, "Scripts", "Script 0", "RollSpinner");
+        } catch(e) {}
+        Object.EndCreate(spinner);
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(spinner, "RenderType", 0); // Normal
-        Object.Teleport(spinner, vector(), vector(), self);
         local link = Link.Create("DetailAttachement", spinner, self);
         LinkTools.LinkSetData(link, "rel pos", vector());
         LinkTools.LinkSetData(link, "rel rot", vector());
@@ -617,21 +623,23 @@ class RollStuntDouble extends SqRootScript
             Property.Set(spinner, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
             Property.Set(spinner, "StTweqJoints", "Joint2AnimS", TWEQ_AS_ONOFF);
         }
-        Property.Set(spinner, "Scripts", "Script 0", "RollSpinner");
         
-        local anchor = Object.Create("fnord");
-        Property.SetSimple(anchor, "ModelName", "waypt");
+        local anchor = Object.BeginCreate("fnord");
+        try {
+            Property.SetSimple(anchor, "ModelName", "waypt");
+            Object.Teleport(anchor, vector(), vector(), self);
+        } catch(e) {}
+        Object.EndCreate(anchor);
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(anchor, "RenderType", 0); // Normal
-        Object.Teleport(anchor, vector(), vector(), self);
         link = Link.Create("DetailAttachement", anchor, spinner);
         LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
         LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
         LinkTools.LinkSetData(link, "rel rot", vector());
-
         link = Link.Create("ScriptParams", self, anchor);
         LinkTools.LinkSetData(link, "", "StuntDouble");
+
         PostMessage(self, "AttachCamera");
     }
 
