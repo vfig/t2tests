@@ -11,6 +11,18 @@
 //              the delay and repeat rate is likely from the user's settings in the os??
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
 
+PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
+PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
+PRJ_FLG_FROMPOS <-  (1 << 2);  // don't init position (only makes sense for concretes)
+PRJ_FLG_GRAVITY <-  (1 << 3);  // object has gravity if default physics
+PRJ_FLG_BOWHACK <-  (1 << 8);  // do all bow hackery
+PRJ_FLG_TELLAI <-   (1 << 9);  // tell AIs about this object
+PRJ_FLG_NOPHYS <-   (1 <<10);  // create the object without adding physics
+PRJ_FLG_MASSIVE <-  (1 <<11);  // slow down the velocity based on projectile mass & launcher mass
+PRJ_FLG_NO_FIRER <- (1<<12);   // don't create firer link
+
+RADIANS_TO_DEGREES <- 180.0/3.1416;
+
 class CmdRoll extends SqRootScript
 {
     function OnPing() {
@@ -26,6 +38,7 @@ class Roll extends SqRootScript
     static DEBUG_SENSORS_STAY = true;
     static DEBUG_LOG_GROUNDED = false;
     static DEBUG_LOG_VELOCITY = false;
+    static DEBUG_PHYSCAST_STAY = true;
 
     static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
     static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
@@ -128,10 +141,151 @@ class Roll extends SqRootScript
         }
     }
 
+    function HackPhysRaycast(fromPos, direction, maxDistance, outHitPos=null, recycleObjects=false) {
+        // Do a raycast against terrain, OBBs, sphere hats, and spheres,
+        // starting at `fromPos`, and going at least `maxDistance` units in
+        // the given world-space direction. Return the distance to the first
+        // hit (or the distance travelled, if no hit).
+
+        // HACK ALERT!
+        //
+        // Use Physics.LaunchProjectile() to force a PhysRaycast so we can
+        // detect OBBs and Sphere/Sphere Hat objects.
+        //
+        // If both launcher and projectile have physics, _and_ you use the
+        // PRJ_FLG_PUSHOUT flag, _and_ the projectile physics is zero radius:
+        // then launchProjectile() does a PhysRaycast out to "pushout distance",
+        // to determine where to put the projectile. If the raycast hits, the
+        // projectile is placed 95% along the line.
+        //
+        // Pushout distance is the sum of the bounding radiuses of the launcher
+        // and projectile _models_ -- not their physics radiuses. But if an
+        // object does not have a model, then a default radius is used for it,
+        // of 2.0*max(scale.xyz)/sqrt(3). So we set the launcher scale to
+        // maxDistance divided by that default radius, and the projectile scale
+        // to zero, so that pushout distance ~= maxDistance.
+        //
+        // If you use the PRJ_FLG_FROMPOS flag with a concrete projectile, the
+        // starting position _and_ facing of that projectile is used for the
+        // launch, so the launcher facing is irrelevant.
+        //
+        // Finally, the PRJ_FLG_ZEROVEL and PRJ_FLG_NOPHYS flags are used to
+        // ensure the projectile velocity will be zero, and the PRJ_FLG_NO_FIRER
+        // flag is used because we don't care about having a Firer link.
+        //
+
+        local launcher = Object.Named("HackPhysLauncher");
+        local projectile = Object.Named("HackPhysProjectile");
+
+        if (launcher==0) {
+            launcher = Object.BeginCreate("object");
+            try {
+                Object.SetName(launcher, "HackPhysLauncher");
+                Property.Set(launcher, "PhysType", "Type", 1); // Sphere
+                Property.Set(launcher, "PhysType", "# Submodels", 1);
+                Property.Set(launcher, "PhysDims", "Radius 1", 0.0);
+                Property.Set(launcher, "PhysDims", "Offset 1", 0.0);
+                Property.Set(launcher, "PhysAttr", "Gravity %", 0.0);
+                Property.Set(launcher, "PhysAttr", "Mass", 0.0);
+                Property.SetSimple(launcher, "CollisionType", 0x0); // No collision.
+                Property.SetSimple(launcher, "RenderType", 1); // Not rendered.
+            } catch(e) {}
+            Object.EndCreate(launcher);
+        }
+
+        if (projectile==0) {
+            projectile = Object.BeginCreate("object");
+            try {
+                Object.SetName(projectile, "HackPhysProjectile");
+                Property.Set(projectile, "PhysType", "Type", 1); // Sphere
+                Property.Set(projectile, "PhysType", "# Submodels", 1);
+                Property.Set(projectile, "PhysDims", "Radius 1", 0.0);
+                Property.Set(projectile, "PhysDims", "Offset 1", 0.0);
+                Property.Set(projectile, "PhysAttr", "Gravity %", 0.0);
+                Property.Set(projectile, "PhysAttr", "Mass", 0.0);
+                Property.Set(projectile, "PhysAttr", "Gravity %", 0.0);
+                Property.Set(projectile, "PhysAttr", "Mass", 0.0);
+                Property.SetSimple(projectile, "CollisionType", 0x0); // No collision.
+                Property.SetSimple(launcher, "RenderType", 1); // Not rendered.
+            } catch(e) {}
+            Object.EndCreate(projectile);
+        }
+
+        // Calculate projectile facing:
+        local facing = vector();
+        direction = direction.GetNormalized();
+        facing.y = -asin(direction.z)*RADIANS_TO_DEGREES;
+        direction.z = 0.0;
+        direction.Normalize();
+        facing.z = atan2(direction.y, direction.x)*RADIANS_TO_DEGREES;
+
+        // Set up for launch:
+        Object.Teleport(launcher, fromPos, vector(), 0);
+        Property.SetSimple(launcher, "ModelName", "");
+        Property.SetSimple(launcher, "Scale", vector(1,1,1)*(maxDistance*0.5*sqrt(3)));
+        Object.Teleport(projectile, fromPos, facing, 0);
+        Property.SetSimple(projectile, "ModelName", "");
+        Property.SetSimple(projectile, "Scale", vector());
+
+        local result = Physics.LaunchProjectile(launcher, projectile, 0.0,
+            PRJ_FLG_ZEROVEL|PRJ_FLG_PUSHOUT|PRJ_FLG_FROMPOS|PRJ_FLG_NO_FIRER|PRJ_FLG_NOPHYS,
+            vector());
+
+        if (result==0) {
+            // The projectile ended up in an invalid position.
+            // launchProjectile() will disable physics on the projectile in this
+            // case, but because we gave it a concrete, it will not destroy it.
+            // So we can still call Object.Position(), and don't actually care
+            // about this warning.
+            print("WARNING: HackPhysCast projectile ended in an invalid position!");
+        }
+
+        local toPos = Object.Position(projectile);
+        local dist = (toPos-fromPos).Length();
+        // launchProjectile pushes out to 95% of the hit distance, so undo that:
+        dist = dist/0.95;
+
+        if (DEBUG_PHYSCAST_STAY) {
+            Property.SetSimple(launcher, "ModelName", "unitbox");
+            Property.SetSimple(launcher, "Scale", vector(1.0,1.0,1.0));
+            Property.SetSimple(launcher, "RenderType", 2); // Unlit.
+            Property.SetSimple(projectile, "ModelName", "waypt");
+            Property.SetSimple(projectile, "Scale", vector(0.25,0.25,0.25));
+            Property.SetSimple(projectile, "RenderType", 2); // Unlit.
+        } else {
+            // If you do multiple HackPhysRaycasts in a row, set
+            // recycleObjects=true for all but the last of them, to reduce
+            // object creation spam.
+            if (! recycleObjects) {
+                Object.Destroy(launcher);
+                Object.Destroy(projectile);
+            }
+        }
+
+        if (outHitPos!=null && (typeof outHitPos)=="vector") {
+            outHitPos.x = toPos.x;
+            outHitPos.y = toPos.y;
+            outHitPos.z = toPos.z;
+        }
+
+        return dist;
+    }
+
+
     function HandleCmdRoll() {
         if (GetData("IsRolling")) return;
 
         print("---- roll pressed ----");
+
+        // TODO: clean this up
+        print("Camera facing:"+Camera.GetFacing());
+        local hitPos = vector();
+        local forward = (Camera.CameraToWorld(vector(1,0,0))-Camera.GetPosition()).GetNormalized();
+        print("Camera forward:"+forward);
+        local dist = HackPhysRaycast(Camera.GetPosition(), forward, 20.0, hitPos);
+        print("Distance to hit (if any): "+dist
+            +" hitPos:"+hitPos);
+        return;
 
 
         if (DEBUG_LOG_VELOCITY) {
