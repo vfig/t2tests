@@ -7,8 +7,20 @@
 //              or pings player to postpone removal of metaprop if present; but
 //              the delay and repeat rate is likely from the user's settings in the os??
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
-//    - can you frob things or pick up a body/junk item mid-roll?
-//    - can you switch weapons mid roll?
+
+// Q. What if you are holding a junk item?
+//    TODO: decide whether to disallow a roll in this situation.
+//
+// Q. What if you are carrying a body?
+// A. Rolling is disabled while carrying a body.
+//
+// Q. Can you frob things or pick up a body/junk item mid-roll?
+// A. No, frobbing is disabled due to the remote camera.
+//
+// Q. What if you roll with a weapon out? Can you use/switch weapons mid roll?
+// A. Weapons are immediately put away and attacks cancelled due to the
+//    remote camera.
+//
 // BUG: in game exe, bind does not show in menu!
 // BUG: in game exe, roll bind does not function!
 // BUG: in game exe, didnt take fall damage, despite no roll!
@@ -158,9 +170,6 @@ class Roll extends SqRootScript
 
     function OnCmdRoll() {
         // TODO: check if controls are locked out, e.g. from remote camera or NoMove() script api?
-        // TODO: what if you are holding a junk item?
-        // TODO: what if you are holding a weapon?
-        // TODO: what if you are carrying a body?
 
         switch (DarkGame.GetPlayerMode()) {
         // Do a roll if grounded in these modes:
@@ -174,7 +183,7 @@ class Roll extends SqRootScript
             break;
 
         // Do nothing for other modes:
-        case ePlayerMode.kPM_BodyCarry: // TODO: allow roll in BodyCarry and force body drop?
+        case ePlayerMode.kPM_BodyCarry:
         case ePlayerMode.kPM_Swim:
         case ePlayerMode.kPM_Climb:
         case ePlayerMode.kPM_Slide:
@@ -556,9 +565,6 @@ class Roll extends SqRootScript
     }
 
     function OnBashStimStimulus() {
-
-        // TODO: check downward and upward squishes to see if they are ambiguous
-        //       (z velocity might help disambiguate)
         print("BashStim"
             +" time:"+GetTime()
             +" intensity:"+message().intensity
@@ -615,6 +621,9 @@ class Roll extends SqRootScript
         local isLanding = (message().collNormal.z>0.0);
 
         // TODO: do we really need this?
+        //       (well, it helps identify situations where a bash is wrongly
+        //        thought to be fall damage! but probably obsolete now with
+        //        the velocity check... i hope?)
         if (m_bashDeferred) {
             // Sanity check the elapsed time since the BashStim
             local elapsedTime = (GetTime()-m_bashTime);
@@ -646,7 +655,8 @@ class Roll extends SqRootScript
             // TODO: tune press window
             // TODO: maybe allow slight window after hitting ground?
             // TODO: maybe have the window only for better speed transfer, and
-            //       allow a roll request anytime during the speedy fall?
+            //       allow a roll request anytime during the speedy fall? or
+            //       have an auto-roll-on-landing config option????
             if (elapsedTime<0.0 || elapsedTime>ROLL_PRELANDING_WINDOW) {
                 m_rollOnLanding = false;
             }
