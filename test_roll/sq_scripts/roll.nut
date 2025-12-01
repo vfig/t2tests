@@ -20,6 +20,40 @@ PRJ_FLG_NO_FIRER <- (1<<12);   // don't create firer link
 
 RADIANS_TO_DEGREES <- 180.0/3.1416;
 
+function DegreesToUintHex(deg) {
+    while (deg<0.0) deg += 360.0;
+    while (deg>360.0) deg -= 360.0;
+    return (deg*65536.0/360.0).tointeger();
+}
+
+function UintHexToDegrees(uinthex) {
+    return (uinthex*360.0/65536.0);
+}
+
+function TeleportObj(obj, pos, fac=null) {
+    // Teleport an object without snapping awareness links. Also breaks physics
+    // contacts so the old problem of teleporting when up against an OBB no
+    // longer prevents movement post-teleport.
+
+    Property.Set(obj, "Position", "Location", pos);
+    if (fac!=null) {
+        Property.Set(obj, "Position", "Heading", DegreesToUintHex(fac.z));
+        Property.Set(obj, "Position", "Pitch", DegreesToUintHex(fac.y));
+        Property.Set(obj, "Position", "Bank", DegreesToUintHex(fac.x));
+    }
+    if (Physics.HasPhysics(obj)) {
+        Property.Set(obj, "PhysState", "Location", pos);
+        if (fac!=null) {
+            Property.Set(obj, "PhysState", "Facing", fac);
+        }
+        // Physics.SetVelocity() breaks all contacts, even if the velocity
+        // doesn't actually change!
+        local vel = vector();
+        Physics.GetVelocity(obj, vel);
+        Physics.SetVelocity(obj, vel);
+    }
+}
+
 class CmdRoll extends SqRootScript
 {
     function OnPing() {
@@ -890,33 +924,5 @@ class RollSpinner extends SqRootScript
             }
         }
         print("ERROR: Did not find stunt double ;_;");
-    }
-}
-
-// TODO: remove
-class DebugSpawnStuntDouble extends SqRootScript
-{
-    function OnTurnOn() {
-        local o = Object.BeginCreate("StuntDouble");
-        Object.Teleport(o, vector(), vector(), self);
-        Object.EndCreate(o);
-        //Property.Set(o, "PhysState", "Rot Velocity", vector(0,-8,0));
-        Physics.ControlCurrentRotation(o);
-        // TODO: make sure this goes in the right direction!!
-        Physics.SetVelocity(o, vector(-30,0,0));
-    }
-}
-
-class DebugSprint extends SqRootScript
-{
-    // 
-    function OnTurnOn() {
-        print("DebugSprint: "+message().message);
-        DrkInv.AddSpeedControl("Sprint", 1.8, 1.0);
-    }
-
-    function OnTurnOff() {
-        print("DebugSprint: "+message().message);
-        DrkInv.RemoveSpeedControl("Sprint");
     }
 }
