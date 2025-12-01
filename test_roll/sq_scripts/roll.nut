@@ -7,6 +7,12 @@
 //              or pings player to postpone removal of metaprop if present; but
 //              the delay and repeat rate is likely from the user's settings in the os??
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
+//    - what if you roll into water?
+//    - can you frob things or pick up a body/junk item mid-roll?
+//    - can you switch weapons mid roll?
+// BUG: in game exe, bind does not show in menu!
+// BUG: in game exe, roll bind does not function!
+// BUG: in game exe, didnt take fall damage, despite no roll!
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
 PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
@@ -69,6 +75,7 @@ class Roll extends SqRootScript
     static DEBUG_LOG_VELOCITY = false;
     static DEBUG_LOG_PHYSCAST = false;
     static DEBUG_PHYSCAST_STAY = false;
+    static DEBUG_FAKE_DEATH = false;
 
     static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
     static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
@@ -125,8 +132,18 @@ class Roll extends SqRootScript
     }
 
     function OnSlain() {
-        // BUG: if you die during the roll (e.g. from radial stim),
-        //      you are still... in the wrong place? investigate.
+        // Abort the roll if we die.
+        Link.BroadcastOnAllLinksData(self, "RollAbort", "ScriptParams", "StuntDouble");
+
+        if (DEBUG_FAKE_DEATH) {
+            if (Engine.ConfigIsDefined("no_endgame")) {
+                Debug.Command("unset no_endgame");
+                DarkGame.KillPlayer();
+                Debug.Command("set no_endgame");
+            } else {
+                DarkGame.KillPlayer();
+            }
+        }
     }
 
     // TODO: remove
@@ -471,7 +488,12 @@ class Roll extends SqRootScript
             SetData("IsRolling", FALSE);
             Sound.PlaySchema(0, "gardrop");
             Object.Destroy(o);
+            return false;
         }
+
+        // Keep a link to the double (so we can abort the roll if needed).
+        local link = Link.Create("ScriptParams", self, o);
+        LinkTools.LinkSetData(link, "", "StuntDouble");
 
         // Start rolling!
         Physics.ControlCurrentRotation(o);
@@ -891,6 +913,11 @@ class RollStuntDouble extends SqRootScript
         TeleportObj(player, Object.Position(self));
     }
 
+    function OnRollAbort() {
+        // Just finish the roll as usual, everything will wind up as normal.
+        OnRollComplete();
+    }
+
     function OnRollComplete() {
         local pos;
         local link = Link.GetOne("ScriptParams", self);
@@ -904,8 +931,22 @@ class RollStuntDouble extends SqRootScript
         local fac = Object.Facing("Player"); // TODO: self?
         if (! DEBUG_NOTELEPORT) {
             TeleportObj("Player", pos, fac);
-            // TODO: see if there is room to stand; stay crouched if not.
-            DarkGame.PlayerMode(ePlayerMode.kPM_Stand);
+            switch (DarkGame.GetPlayerMode()) {
+            // Stand up when the roll is finished.
+            case ePlayerMode.kPM_Stand:
+            case ePlayerMode.kPM_Crouch:
+            case ePlayerMode.kPM_Jump:
+                // TODO: see if there is room to stand; stay crouched if not.
+                DarkGame.PlayerMode(ePlayerMode.kPM_Stand);
+                break;
+            // No mode change for other modes (especially dead!):
+            case ePlayerMode.kPM_BodyCarry:
+            case ePlayerMode.kPM_Swim:
+            case ePlayerMode.kPM_Climb:
+            case ePlayerMode.kPM_Slide:
+            case ePlayerMode.kPM_Dead:
+                break;
+            }
             DrkInv.RemoveSpeedControl("RollGlue");
         }
         if (! DEBUG_NOATTACH)
