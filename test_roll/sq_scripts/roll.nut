@@ -137,6 +137,9 @@ class Roll extends SqRootScript
 
     function OnCmdRoll() {
         // TODO: check if controls are locked out, e.g. from remote camera or NoMove() script api?
+        // TODO: what if you are holding a junk item?
+        // TODO: what if you are holding a weapon?
+        // TODO: what if you are carrying a body?
 
         switch (DarkGame.GetPlayerMode()) {
         // Do a roll if grounded in these modes:
@@ -814,13 +817,15 @@ class RollStuntDouble extends SqRootScript
         //       side effect!
         Physics.SetVelocity("Player", vector());
 
-        // TODO: unphysicalise the player (can we?) and DetailAttach them to
-        //       the stunt double too. (and make them 100% transparent?)
-
         // NOTE: We can't remove PhysType from the player, because when adding
-        //       it again, its just a default 1 big sphere, not the correct 5 submodels.
-        // TODO: But maybe we can *copy* phys properties from a reference object?
+        //       it again, its just a default 1 big sphere, not the correct 5
+        //       submodels. And we can't use Property.CopyFrom to copy the whole
+        //       shebang either, cause that only sets Radius/Offset correctly
+        //       for the first 2 submodels. So we have to make do with simply
+        //       disabling all object collision for the duration of the roll.
         Property.SetSimple("Player", "CollisionType", 0); // None
+        if (! DEBUG_VISIBLEPARTS)
+            Property.SetSimple("Player", "RenderAlpha", 0.0);
 
         local spinner = Object.BeginCreate("fnord");
         try {
@@ -880,6 +885,8 @@ class RollStuntDouble extends SqRootScript
             Camera.StaticAttach(anchor);
             PostMessage(self, "AttachCamera");
         }
+        local player = Object.Named("Player");
+        TeleportObj(player, Object.Position(self));
     }
 
     function OnRollComplete() {
@@ -894,8 +901,7 @@ class RollStuntDouble extends SqRootScript
         }
         local fac = Object.Facing("Player"); // TODO: self?
         if (! DEBUG_NOTELEPORT) {
-            // TODO: set position instead of teleport so as not to break awareness.
-            Object.Teleport("Player", pos, fac, 0);
+            TeleportObj("Player", pos, fac);
             // TODO: see if there is room to stand; stay crouched if not.
             DarkGame.PlayerMode(ePlayerMode.kPM_Stand);
             DrkInv.RemoveSpeedControl("RollGlue");
@@ -907,6 +913,9 @@ class RollStuntDouble extends SqRootScript
         Physics.GetVelocity(self, vel);
         // TODO: save/load the CollisionType instead of hardcoding?
         Property.SetSimple("Player", "CollisionType", 0x1); // Bounce
+        // TODO: interaction with RenderAlpha set and invisibility potion?
+        if (! DEBUG_VISIBLEPARTS)
+            Property.SetSimple("Player", "RenderAlpha", 1.0);
         SendMessage("Player", "RollComplete", vel);
 
         if (! DEBUG_NODESTROY)
