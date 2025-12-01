@@ -75,3 +75,15 @@ class RoomDumpObjects extends SqRootScript
         }
     }
 }
+
+class HackPlayerPhysics extends SqRootScript
+{
+    function OnTurnOn() {
+        // WELP: turns out Property.CopyFrom() still only does the first two
+        //       submodel radiuses/offsets. so its no better than us setting
+        //       the property manually.
+        local player = Object.Named("Player");
+        local result = Property.CopyFrom(self, "PhysType", player); print("Copy PhysType:"+result);
+        local result = Property.CopyFrom(self, "PhysDims", player); print("Copy PhysDims:"+result);
+    }
+}
