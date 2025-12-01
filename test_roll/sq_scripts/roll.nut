@@ -72,6 +72,7 @@ class Roll extends SqRootScript
 
     static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
     static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
+    static ROLL_FALL_DAMAGE_SPEED = -15.0;      // Threshold for deciding if a bash is from fall damage.
     static ROLL_PRELANDING_WINDOW = 0.5;        // Start of window for pressing roll pre-landing.
     static ROLL_DAMAGE_REDUCTION = 6.0;         // How much a roll subtracts from incoming fall damage.
     static ROLL_VELOCITY_TRANSFER = 0.6;        // How much fall speed is transferred to a landing roll.
@@ -527,14 +528,15 @@ class Roll extends SqRootScript
             +" source:"+message().source);
         print("BashStim.sensor from:"+desc(LinkSource(message().sensor))+" to:"+desc(LinkDest(message().sensor)));
         print("BashStim.source from:"+desc(LinkSource(message().source))+" to:"+desc(LinkDest(message().source)));
-
         DumpVelocity();
 
-        if (message().source==0) {
-            // Physics bash.
+        local vel = vector();
+        Physics.GetVelocity(self, vel);
 
-            // We can't tell yet whether the bash is from an object hitting us
-            // or the ground hiting us. We save the crucial details so we can
+        if (message().source==0              // Physics bash
+        && vel.z<=ROLL_FALL_DAMAGE_SPEED) {  // From fall damage, presumably.
+            // We can't tell for sure yet whether the bash is from an object hitting us
+            // or the ground hitting us. We save the crucial details so we can
             // decide whether to apply damage or not when the PhysCollision happens.
             m_bashDeferred = true;
             m_bashTime = GetTime();
