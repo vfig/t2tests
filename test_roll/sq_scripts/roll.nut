@@ -7,7 +7,6 @@
 //              or pings player to postpone removal of metaprop if present; but
 //              the delay and repeat rate is likely from the user's settings in the os??
 //    - see bug note in bnd.ini (BUG? commands after first dont show their string in the ui)
-//    - what if you roll into water?
 //    - can you frob things or pick up a body/junk item mid-roll?
 //    - can you switch weapons mid roll?
 // BUG: in game exe, bind does not show in menu!
@@ -76,6 +75,7 @@ class Roll extends SqRootScript
     static DEBUG_LOG_PHYSCAST = false;
     static DEBUG_PHYSCAST_STAY = false;
     static DEBUG_FAKE_DEATH = false;
+    static DEBUG_ACTIONCAM = false;
 
     static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
     static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
@@ -504,6 +504,11 @@ class Roll extends SqRootScript
         print("ROLL BEGIN. pos:"+spawnpos+" velocity:"+velocity);
         SendMessage(o, "RollBegin");
 
+        if (DEBUG_ACTIONCAM) {
+            Debug.Command("player_cam_control 1");
+            Debug.Command("player_cam_control 1");
+        }
+
         return true;
     }
 
@@ -523,7 +528,6 @@ class Roll extends SqRootScript
         print("ROLL COMPLETE. remainingVel:"+remainingVel);
         // Transfer remaining velocity to player.
         Physics.SetVelocity("Player", remainingVel);
-
     }
 
     function OnTimer() {
@@ -860,7 +864,7 @@ class RollStuntDouble extends SqRootScript
         //       for the first 2 submodels. So we have to make do with simply
         //       disabling all object collision for the duration of the roll.
         Property.SetSimple("Player", "CollisionType", 0); // None
-        if (! DEBUG_VISIBLEPARTS)
+        if (! DEBUG_VISIBLEPARTS && ! Roll.DEBUG_ACTIONCAM)
             Property.SetSimple("Player", "RenderAlpha", 0.0);
 
         local spinner = Object.BeginCreate("fnord");
@@ -922,15 +926,17 @@ class RollStuntDouble extends SqRootScript
     }
 
     function OnAttachCamera() {
-        if (DEBUG_NOATTACH)
-            return;
-        local anchor = GetAnchor();
-        if (anchor) {
-            Camera.StaticAttach(anchor);
-            PostMessage(self, "AttachCamera");
+        if (! DEBUG_NOATTACH && ! Roll.DEBUG_ACTIONCAM) {
+            local anchor = GetAnchor();
+            if (anchor) {
+                Camera.StaticAttach(anchor);
+            }
         }
-        local player = Object.Named("Player");
-        TeleportObj(player, Object.Position(self));
+        if (! DEBUG_NOTELEPORT) {
+            local player = Object.Named("Player");
+            TeleportObj(player, Object.Position(self));
+        }
+        PostMessage(self, "AttachCamera");
     }
 
     function OnRollAbort() {
@@ -968,7 +974,7 @@ class RollStuntDouble extends SqRootScript
             }
             DrkInv.RemoveSpeedControl("RollGlue");
         }
-        if (! DEBUG_NOATTACH)
+        if (! DEBUG_NOATTACH && ! Roll.DEBUG_ACTIONCAM)
             Camera.ForceCameraReturn();
 
         local vel = vector();
@@ -976,7 +982,7 @@ class RollStuntDouble extends SqRootScript
         // TODO: save/load the CollisionType instead of hardcoding?
         Property.SetSimple("Player", "CollisionType", 0x1); // Bounce
         // TODO: interaction with RenderAlpha set and invisibility potion?
-        if (! DEBUG_VISIBLEPARTS)
+        if (! DEBUG_VISIBLEPARTS && ! Roll.DEBUG_ACTIONCAM)
             Property.SetSimple("Player", "RenderAlpha", 1.0);
         SendMessage("Player", "RollComplete", vel);
 
