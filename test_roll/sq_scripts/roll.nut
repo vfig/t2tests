@@ -133,7 +133,10 @@ class Roll extends SqRootScript
 
     function OnSlain() {
         // Abort the roll if we die.
-        Link.BroadcastOnAllLinksData(self, "RollAbort", "ScriptParams", "StuntDouble");
+        local double = GetStuntDouble();
+        if (double) {
+            SendMessage(double, "RollAbort");
+        }
 
         if (DEBUG_FAKE_DEATH) {
             if (Engine.ConfigIsDefined("no_endgame")) {
@@ -502,6 +505,15 @@ class Roll extends SqRootScript
         SendMessage(o, "RollBegin");
 
         return true;
+    }
+
+    function GetStuntDouble() {
+        foreach (link in Link.GetAll("ScriptParams", self)) {
+            if (LinkTools.LinkGetData(link, "")=="StuntDouble") {
+                return LinkDest(link);
+            }
+        }
+        return 0;
     }
 
     function OnRollComplete() {
@@ -895,17 +907,25 @@ class RollStuntDouble extends SqRootScript
         LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
         LinkTools.LinkSetData(link, "rel rot", vector());
         link = Link.Create("ScriptParams", self, anchor);
-        LinkTools.LinkSetData(link, "", "StuntDouble");
+        LinkTools.LinkSetData(link, "", "StuntAnchor");
 
         PostMessage(self, "AttachCamera");
+    }
+
+    function GetAnchor() {
+        foreach (link in Link.GetAll("ScriptParams", self)) {
+            if (LinkTools.LinkGetData(link, "")=="StuntAnchor") {
+                return LinkDest(link);
+            }
+        }
+        return 0;
     }
 
     function OnAttachCamera() {
         if (DEBUG_NOATTACH)
             return;
-        local link = Link.GetOne("ScriptParams", self);
-        if (link) {
-            local anchor = LinkDest(link);
+        local anchor = GetAnchor();
+        if (anchor) {
             Camera.StaticAttach(anchor);
             PostMessage(self, "AttachCamera");
         }
@@ -920,9 +940,8 @@ class RollStuntDouble extends SqRootScript
 
     function OnRollComplete() {
         local pos;
-        local link = Link.GetOne("ScriptParams", self);
-        if (link) {
-            local anchor = LinkDest(link);
+        local anchor = GetAnchor();
+        if (anchor) {
             pos = Object.Position(anchor)+vector(0,0,0.25);
         } else {
             // Hack, in case anchor is gone, to keep player out of the ground.
@@ -970,7 +989,7 @@ class RollSpinner extends SqRootScript
 {
     function OnSlain() {
         foreach (link in Link.GetAll("~ScriptParams")) {
-            if (LinkTools.LinkGetData(link, "")=="StuntDouble") {
+            if (LinkTools.LinkGetData(link, "")=="StuntAnchor") {
                 SendMessage(LinkDest(link), "RollComplete");
                 return;
             }
