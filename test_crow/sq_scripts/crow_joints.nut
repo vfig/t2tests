@@ -19,6 +19,19 @@ class BaseCrowJoints extends SqRootScript
         weird           = [  20,     19.2407, -26.9055, -23.6133, 0.0820251, -85.6 ],
     };
 
+    function StopJointTweqs() {
+        // Disable all joint tweqs.
+        for (local j=0; j<MAX_JOINT; ++j) {
+            SetProperty("StTweqJoints", JOINT_STATE_ANIM_FIELD[j], 0);
+        }
+        SetProperty("StTweqJoints", "AnimS", 0);
+    }
+
+    function ApplyPose(poseName) {
+        local pose = _GetPoseByName(poseName);
+        _SetJointsToPose(pose);
+    }
+
     function AnimateToRandomPresetPose() {
         local choice = rand() % POSES.len();
         local i = 0;
@@ -32,6 +45,11 @@ class BaseCrowJoints extends SqRootScript
     }
 
     function AnimateToPose(poseName) {
+        local pose = _GetPoseByName(poseName);
+        _AnimateJointsToPose(pose);
+    }
+
+    function _GetPoseByName(poseName) {
         local pose;
         if (poseName=="random") {
             pose = clone POSES.reset;
@@ -44,7 +62,7 @@ class BaseCrowJoints extends SqRootScript
         } else {
             pose = clone POSES[poseName]
         }
-        _AnimateJointsToPose(pose);
+        return pose;
     }
 
     function _AnimateJointsToPose(pose) {
@@ -111,9 +129,24 @@ class BaseCrowJoints extends SqRootScript
             }
         }
         SetProperty("StTweqJoints", "AnimS", 0);
+        SetProperty("CfgTweqJoints", "Halt", TWEQ_HALT_STOP);
         SetProperty("CfgTweqJoints", "MiscC", TWEQ_MC_SCRIPTS);
         SetProperty("CfgTweqJoints", "AnimC", TWEQ_AC_SIM);
+        SetProperty("CfgTweqJoints", "CurveC", 0);
         SetProperty("StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
+    }
+
+    function _SetJointsToPose(pose) {
+        // pose is an array: [hip_right, hip_left, shoulder_pitch, neck_rotation, neck_stretch, head_rotation].
+        print("Crow "+self+" pose is: ["+pose[0]+", "+pose[1]+", "+pose[2]+", "+pose[3]+", "+pose[4]+", "+pose[5]+"]");
+
+        StopJointTweqs();
+
+        // Assign joint positions.
+        for (local j=0; j<MAX_JOINT; ++j) {
+            local target = pose[j];
+            SetProperty("JointPos", JOINT_POS_FIELD[j], target);
+        }
     }
 
     function OnTweqComplete() {
@@ -201,9 +234,30 @@ class CrowJointsTest extends BaseCrowJoints
 
 class CrowJointsRandom extends BaseCrowJoints
 {
-    function OnSim() {
-        if (message().starting) {
-            SendMessage(self, "TurnOn");
+    function OnBeginScript() {
+        // When the mission starts, a crow is spawned, or if the script was
+        // removed/overridden and then re-added/restored, then we need to begin
+        // animating. We start by applying the reset post to ensure all the
+        // tweq properties are in the state that we need.
+        //
+        // Note that we can't remember in the latter case if we had been turned
+        // on or off (the script data appears to get cleared when the script is
+        // removed). So we assume we should be turned on.
+        //
+        // Unfortunately this also means that pose and on/off state wont be kept
+        // across save/load! Hopefully not a problem.
+        //
+        ApplyPose("reset");
+        PostMessage(self, "TurnOn");
+    }
+
+    function OnEndScript() {
+        // If the script is removed/overridden, we need to disable everything
+        // so tweqs wont go running off over the hills and far away.
+        StopJointTweqs();
+        if (IsDataSet("Timer")) {
+            KillTimer(GetData("Timer"));
+            ClearData("Timer");
         }
     }
 
