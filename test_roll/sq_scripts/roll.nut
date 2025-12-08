@@ -912,7 +912,7 @@ class RollStuntDouble extends SqRootScript
         
         local relpos = vector();
         local relfac = vector();
-        Object.CalcRelTransform("Player", self, relpos, relfac, 4 /* RelSubPhysModel */, 1 /* Head */);
+        Object.CalcRelTransform("Player", self, relpos, relfac, 4 /* RelSubPhysModel */, 0 /* Head */);
 
         local anchor = Object.BeginCreate("fnord");
         try {
