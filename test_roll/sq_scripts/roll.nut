@@ -24,6 +24,7 @@
 // BUG: in game exe, bind does not show in menu!
 // BUG: in game exe, roll bind does not function!
 // BUG: in game exe, didnt take fall damage, despite no roll!
+// TODO: use Debug.Log() for logging in game exe (goes into dromed.log/thief.log)
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
 PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
@@ -357,10 +358,6 @@ class Roll extends SqRootScript
         if (isGrounded || velz>=ROLL_MIDAIR_VELOCITY_CUTOFF) {
             // Grounded or not falling fast: do a roll now.
 
-            // Get XY forward vector.
-            local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
-            forward.z = 0.0;
-            forward.Normalize();
 
             // Boost velocity so we can roll from standing, or roll much
             // farther while running.
@@ -370,6 +367,7 @@ class Roll extends SqRootScript
                 // Reduce boost if rolling in midair (no ground to push off)
                 boost *= 0.5;
             }
+            local forward = CalcRollDirection(velxy);
             velxy += (forward*boost)
             print("Roll: boost mag:"+velxy.Length());
 
@@ -380,6 +378,17 @@ class Roll extends SqRootScript
             m_rollOnLanding = true;
             m_rollPressTime = GetTime();
             DumpVelocity();
+        }
+    }
+
+    function CalcRollDirection(velxy) {
+        if (velxy.Length()<1.0) {
+            local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
+            forward.z = 0.0;
+            forward.Normalize();
+            return forward;
+        } else {
+            return velxy.GetNormalized();
         }
     }
 
@@ -425,10 +434,8 @@ class Roll extends SqRootScript
         local vpos = vector();
         local vneg = vector();
 
-        // TODO: raycast 'local' direction MUST BE IN VELOCITY direction, not
-        //       in FACING direction. so these are wrong [at least when we allow non-forward rolls]!
-        local worldXDir = (Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self));
-        local worldYDir = (Object.ObjectToWorld(self, vector(0,1,0))-Object.Position(self));
+        local worldXDir = CalcRollDirection(velocity);
+        local worldYDir = worldXDir.Cross(vector(0,0,1));
 
         // Check if physcasts report enough room.
         vpos.x = HackPhysRaycast(spawnpos, worldXDir, raycastLength, null, true, false);
@@ -481,10 +488,8 @@ class Roll extends SqRootScript
             }
         }
 
-        // TODO: also support sideways/diagonal rolls if the player is strafing!
-        //       (which means the player facing we restore to will not always
-        //       be the same direction as the roll velocity).
-        local spawnfac = Object.Facing(self);
+        local spawnfac = vector();
+        spawnfac.z = atan2(worldXDir.y, worldXDir.x)*RADIANS_TO_DEGREES;
         
         local o = Object.BeginCreate(arch)
         try {
@@ -683,14 +688,12 @@ class Roll extends SqRootScript
         Physics.GetVelocity(self, velxy);
         local velz = velxy.z;
         velxy.z = 0.0;
-        // Get XY forward vector.
-        local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
-        forward.z = 0.0;
-        forward.Normalize();
+
         // Convert z velocity into roll velocity.
         print("Roll: velz:"+velz);
         print("Roll: velxy mag:"+velxy.Length());
         local boost = fabs(velz)*ROLL_VELOCITY_TRANSFER;
+        local forward = CalcRollDirection(velxy);
         velxy += (forward*boost)
         print("Roll: boost mag:"+velxy.Length());
 
@@ -907,6 +910,10 @@ class RollStuntDouble extends SqRootScript
             Property.Set(spinner, "StTweqJoints", "Joint2AnimS", TWEQ_AS_ONOFF);
         }
         
+        local relpos = vector();
+        local relfac = vector();
+        Object.CalcRelTransform("Player", self, relpos, relfac, 4 /* RelSubPhysModel */, 1 /* Head */);
+
         local anchor = Object.BeginCreate("fnord");
         try {
             Property.SetSimple(anchor, "ModelName", "waypt");
@@ -919,7 +926,7 @@ class RollStuntDouble extends SqRootScript
         LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
         LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
-        LinkTools.LinkSetData(link, "rel rot", vector());
+        LinkTools.LinkSetData(link, "rel rot", -relfac);
         link = Link.Create("ScriptParams", self, anchor);
         LinkTools.LinkSetData(link, "", "StuntAnchor");
 
@@ -963,7 +970,7 @@ class RollStuntDouble extends SqRootScript
             // Hack, in case anchor is gone, to keep player out of the ground.
             pos = Object.Position(self)+vector(0,0,2);
         }
-        local fac = Object.Facing("Player"); // TODO: self?
+        local fac = Object.Facing("Player");
         if (! DEBUG_NOTELEPORT) {
             TeleportObj("Player", pos, fac);
             switch (DarkGame.GetPlayerMode()) {
