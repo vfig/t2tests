@@ -92,6 +92,7 @@ class Roll extends SqRootScript
 
     static ROLL_VELOCITY_BOOST = 20.0;          // Extra speed from the roll.
     static ROLL_MIDAIR_VELOCITY_CUTOFF = -15.0; // Can't midair roll when falling faster than this.
+    static ROLL_BIG_LANDING_SPEED = -35.0;      // Threshold for deciding if a (Landing true) sound should play.
     static ROLL_FALL_DAMAGE_SPEED = -15.0;      // Threshold for deciding if a bash is from fall damage.
     static ROLL_PRELANDING_WINDOW = 0.5;        // Start of window for pressing roll pre-landing.
     static ROLL_DAMAGE_REDUCTION = 6.0;         // How much a roll subtracts from incoming fall damage.
@@ -372,7 +373,7 @@ class Roll extends SqRootScript
             print("Roll: boost mag:"+velxy.Length());
 
             local fromFootLevel = isGrounded;
-            DoRoll(velxy, fromFootLevel);
+            DoRoll(velxy, fromFootLevel, true);
         } else {
             // If we land imminently, we will do a roll then.
             m_rollOnLanding = true;
@@ -392,7 +393,7 @@ class Roll extends SqRootScript
         }
     }
 
-    function DoRoll(velocity, fromFootLevel) {
+    function DoRoll(velocity, fromFootLevel, playLandingSound) {
         if (GetData("IsRolling")) return false;
         SetData("IsRolling", TRUE);
 
@@ -516,7 +517,7 @@ class Roll extends SqRootScript
         Physics.ControlCurrentRotation(o);
         Physics.SetVelocity(o, velocity);
         print("ROLL BEGIN. pos:"+spawnpos+" velocity:"+velocity);
-        SendMessage(o, "RollBegin");
+        SendMessage(o, "RollBegin", playLandingSound);
 
         if (DEBUG_ACTIONCAM) {
             Debug.Command("player_cam_control 1");
@@ -697,7 +698,17 @@ class Roll extends SqRootScript
         velxy += (forward*boost)
         print("Roll: boost mag:"+velxy.Length());
 
-        local didRoll = DoRoll(velxy, false);
+        local didRoll = DoRoll(velxy, false, false);
+
+        if (didRoll) {
+            local tags = "Event Footstep, CreatureType Player";
+            if (velz<ROLL_BIG_LANDING_SPEED)
+                tags += ", Landing true";
+            if (Property.Possessed(message().collObj, "Material Tags")) {
+                tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
+            }
+            Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+        }
 
         if (m_bashDeferred) {
             // Reduce incoming damage if we had room to roll.
@@ -843,10 +854,15 @@ class RollStuntDouble extends SqRootScript
     DEBUG_VISIBLEPARTS = false;
 
     function OnBeginScript() {
+        Physics.SubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(self, "RenderAlpha", 0.25);
         else
             Property.SetSimple(self, "RenderType", 1); // Not Rendered
+    }
+
+    function OnEndScript() {
+        Physics.UnsubscribeMsg(self, ePhysScriptMsgType.kCollisionMsg);
     }
 
     function OnRollBegin() {
@@ -930,6 +946,9 @@ class RollStuntDouble extends SqRootScript
         link = Link.Create("ScriptParams", self, anchor);
         LinkTools.LinkSetData(link, "", "StuntAnchor");
 
+        local playLandingSound = message().data;
+        SetData("PlayLandingSound", (playLandingSound? TRUE : FALSE));
+
         PostMessage(self, "AttachCamera");
     }
 
@@ -1005,6 +1024,55 @@ class RollStuntDouble extends SqRootScript
 
         if (! DEBUG_NODESTROY)
             Object.Destroy(self);
+    }
+
+    function OnPhysCollision() {
+        if (Roll.DEBUG_LOG_COLLISIONS) {
+            if (message().Submod==1  // PLAYER_FOOT
+            ||message().Submod==3    // PLAYER_KNEE
+            ||message().Submod==4) { // PLAYER_SHIN
+                local typeString = "unknown";
+                switch(message().collType) {
+                case ePhysCollisionType.kCollNone: typeString = "none"; break;
+                case ePhysCollisionType.kCollTerrain: typeString = "terrain"; break;
+                case ePhysCollisionType.kCollObject: typeString = "object"; break;
+                }
+                print("StuntDouble: "+message().message
+                    +" bodypart:"+message().Submod
+                    +" time:"+GetTime()
+                    +" type:"+typeString
+                    +" obj:"+desc(message().collObj)
+                    +" submod:"+message().collSubmod
+                    +" momentum:"+message().collMomentum
+                    +" normal.z:"+message().collNormal.z
+                    +" pos:"+message().collPt);
+            }
+        }
+
+        // Check if we are hitting something downward.
+        local isLanding = (message().collNormal.z>0.0);
+
+        if (isLanding) {
+            if (GetData("PlayLandingSound")) {
+                // Only play the first time, as StuntDouble tends to collide with
+                // the ground multiple times while rolling!
+                ClearData("PlayLandingSound");
+
+                local tags = "Event Footstep, CreatureType Player";
+                if (Property.Possessed(message().collObj, "Material Tags")) {
+                    tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
+                }
+                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+            }
+        } else {
+            if (message().collType==ePhysCollisionType.kCollObject) {
+                local tags = "Event Collision, CreatureType StuntDouble";
+                if (Property.Possessed(message().collObj, "Material Tags")) {
+                    tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
+                }
+                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+            }
+        }
     }
 }
 
