@@ -707,7 +707,7 @@ class Roll extends SqRootScript
             if (Property.Possessed(message().collObj, "Material Tags")) {
                 tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
             }
-            Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+            Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundAtObjLoc);
         }
 
         if (m_bashDeferred) {
@@ -1062,7 +1062,7 @@ class RollStuntDouble extends SqRootScript
                 if (Property.Possessed(message().collObj, "Material Tags")) {
                     tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
                 }
-                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundAtObjLoc);
             }
         } else {
             if (message().collType==ePhysCollisionType.kCollObject) {
@@ -1070,7 +1070,7 @@ class RollStuntDouble extends SqRootScript
                 if (Property.Possessed(message().collObj, "Material Tags")) {
                     tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
                 }
-                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundOnObj);
+                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundAtObjLoc);
             }
         }
     }
