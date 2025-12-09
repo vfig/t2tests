@@ -32,7 +32,7 @@
 //        submodel 1 sitting higher? might need Rotation controls on StuntDouble.
 // BUG: collision sound when rolling through doorway with open door :(
 // BUG: collision sound when arrow hits stunt double.
-// BUG: player physics is wonky after rolling? tripping on bodies, shoving pool gear around... wrong collision type or what?
+// BUG? roll while leaning doesnt side roll.
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
 PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
@@ -106,7 +106,7 @@ class Roll extends SqRootScript
     static ROLL_DAMAGE_REDUCTION = 6.0;         // How much a roll subtracts from incoming fall damage.
     static ROLL_VELOCITY_TRANSFER = 0.6;        // How much fall speed is transferred to a landing roll.
     static ROLL_MINIMUM_FORWARD_SPACE = 6.0;    // Can't roll forward with less space than this.
-    static ROLL_CAMERA_OFFSETZ = 1.25;
+    static ROLL_CAMERA_OFFSETZ = 1.95;
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
@@ -858,7 +858,7 @@ class RollStuntDouble extends SqRootScript
     DEBUG_NOATTACH = false;
     DEBUG_NOTELEPORT = false;
     DEBUG_NODESTROY = false;
-    DEBUG_NOROLL = false;
+    DEBUG_NOROLL = true;
     DEBUG_VISIBLEPARTS = false;
 
     function OnBeginScript() {
@@ -973,6 +973,7 @@ class RollStuntDouble extends SqRootScript
         if (! DEBUG_NOATTACH && ! Roll.DEBUG_ACTIONCAM) {
             local anchor = GetAnchor();
             if (anchor) {
+                print("anchor:"+Object.Position(anchor)+" double:"+Object.Position(self));
                 Camera.StaticAttach(anchor);
             }
         }
