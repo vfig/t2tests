@@ -114,7 +114,7 @@ tag Material2 Carpet Ceramic Earth Flesh Glass GlassBits Gravel Ice Liquid Metal
 //Tags for Creature types//
 ///////////////////////////
 
-tag CreatureType Ape Apparition Burrick Camera Cherub CombatBot Crayman ElemFire EyeBall Frog Guard GuardNoKO Haunt Player Rat ScurryBot Servant Spider SpiderBot StuntDouble TreeBeast Turret WorkerBot Zombie 
+tag CreatureType Ape Apparition Burrick Camera Cherub CombatBot Crayman ElemFire EyeBall Frog Guard GuardNoKO Haunt Player Rat ScurryBot Servant Spider SpiderBot TreeBeast Turret WorkerBot Zombie 
 
 
 /////////////////////////
