@@ -25,6 +25,14 @@
 // BUG: in game exe, roll bind does not function!
 // BUG: in game exe, didnt take fall damage, despite no roll!
 // TODO: use Debug.Log() for logging in game exe (goes into dromed.log/thief.log)
+// BUG: can roll through guards!
+// BUG: cant initiate roll when standing in doorway.
+// BUG? maybe cant roll through 3.5x7 doorway??
+// QUERY: can we do two player-radius sphere models on StuntDouble, with
+//        submodel 1 sitting higher? might need Rotation controls on StuntDouble.
+// BUG: collision sound when rolling through doorway with open door :(
+// BUG: collision sound when arrow hits stunt double.
+// BUG: player physics is wonky after rolling? tripping on bodies, shoving pool gear around... wrong collision type or what?
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
 PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
