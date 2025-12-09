@@ -80,6 +80,8 @@ class CmdRoll extends SqRootScript
     }
 }
 
+ROLL_DISABLE_ROTATION <- false;  // Disable rotation visuals.
+
 class Roll extends SqRootScript
 {
     static DEBUG_LOG_COLLISIONS = false;
@@ -102,7 +104,7 @@ class Roll extends SqRootScript
     static ROLL_SPINNER_OFFSETZ = 0.7;          // Height of spinner above double origin.
     static ROLL_CAMERA_OFFSETZ = 1.25;          // Height of camera above spinner origin.
     static ROLL_PHYSCAST_OFFSETZ = 1.5;         // Height of 1st physcast above spinner origin.
-    static ROLL_PHYSCAST2_OFFSETZ = 2.4;       // Height of 2nd physcast above spinner origin.
+    static ROLL_PHYSCAST2_OFFSETZ = 2.4;        // Height of 2nd physcast above spinner origin.
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
@@ -130,6 +132,10 @@ class Roll extends SqRootScript
             Physics.SubscribeMsg(self,
                  ePhysScriptMsgType.kCollisionMsg
                 |ePhysScriptMsgType.kContactMsg);
+
+            if (Engine.ConfigIsDefined("roll_disable_rotation")) {
+                ROLL_DISABLE_ROTATION = true;
+            }
 
             // Are we currently in a roll.
             if (! IsDataSet("IsRolling")) SetData("IsRolling", FALSE);
@@ -885,7 +891,6 @@ class RollStuntDouble extends SqRootScript
     DEBUG_NOATTACH = false;
     DEBUG_NOTELEPORT = false;
     DEBUG_NODESTROY = false;
-    DEBUG_NOROLL = false;
     DEBUG_VISIBLEPARTS = false;
 
     function OnBeginScript() {
@@ -956,10 +961,8 @@ class RollStuntDouble extends SqRootScript
         Property.Set(spinner, "CfgTweqJoints", "Joint2CurveC", 0);
         Property.Set(spinner, "CfgTweqJoints", "    rate-low-high2", vector(40.0,0,360));
         Property.Set(spinner, "StTweqJoints", "MiscS", 0);
-        if (! DEBUG_NOROLL) {
-            Property.Set(spinner, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
-            Property.Set(spinner, "StTweqJoints", "Joint2AnimS", TWEQ_AS_ONOFF);
-        }
+        Property.Set(spinner, "StTweqJoints", "AnimS", TWEQ_AS_ONOFF);
+        Property.Set(spinner, "StTweqJoints", "Joint2AnimS", TWEQ_AS_ONOFF);
         
         local relpos = vector();
         local relfac = vector();
@@ -973,10 +976,14 @@ class RollStuntDouble extends SqRootScript
         Object.EndCreate(anchor);
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(anchor, "RenderType", 0); // Normal
-        link = Link.Create("DetailAttachement", anchor, spinner);
+        link = Link.Create("DetailAttachement", anchor,
+            (ROLL_DISABLE_ROTATION? self : spinner) );
         LinkTools.LinkSetData(link, "vhot/sub #", 6);
         LinkTools.LinkSetData(link, "Type", 4); // Subobject
-        LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_CAMERA_OFFSETZ));
+        LinkTools.LinkSetData(link, "rel pos",
+            (ROLL_DISABLE_ROTATION?
+                vector(0,0,Roll.ROLL_SPINNER_OFFSETZ+Roll.ROLL_CAMERA_OFFSETZ)
+              : vector(0,0,Roll.ROLL_CAMERA_OFFSETZ)) );
         LinkTools.LinkSetData(link, "rel rot", -relfac);
         link = Link.Create("ScriptParams", self, anchor);
         LinkTools.LinkSetData(link, "", "StuntAnchor");
