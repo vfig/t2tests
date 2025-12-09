@@ -27,7 +27,6 @@
 // TODO: use Debug.Log() for logging in game exe (goes into dromed.log/thief.log)
 // BUG: collision sound when rolling through doorway with open door :(
 // BUG: collision sound when arrow hits stunt double.
-// FEELS BAD: roll while leaning doesnt side roll.
 // FEELS BAD: cant roll onto low (<=2 high) step.
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
@@ -389,12 +388,36 @@ class Roll extends SqRootScript
         }
     }
 
+    function GetLean() {
+        local relpos = vector();
+        local relfac = vector();
+        Object.CalcRelTransform(self, self, relpos, relfac, 4 /* RelSubPhysModel */, 0 /* PLAYER_HEAD */);
+        if (fabs(relpos.y)>=0.2) {
+            if (relpos.y>0) {
+                return -1; // Leaning right
+            } else {
+                return 1; // Leaning left
+            }
+        } else {
+            return 0; // Not leaning (enough).
+        }
+    }
+
     function CalcRollDirection(velxy) {
         if (velxy.Length()<1.0) {
-            local forward = Object.ObjectToWorld(self, vector(1,0,0))-Object.Position(self);
-            forward.z = 0.0;
-            forward.Normalize();
-            return forward;
+            local ofs;
+            switch (GetLean()) {
+            case 1:
+                ofs = vector(0,1,0); break;
+            case -1:
+                ofs = vector(0,-1,0); break;
+            default:
+                ofs = vector(1,0,0); break;
+            }
+            local dir = Object.ObjectToWorld(self, ofs)-Object.Position(self);
+            dir.z = 0.0;
+            dir.Normalize();
+            return dir;
         } else {
             return velxy.GetNormalized();
         }
@@ -431,7 +454,10 @@ class Roll extends SqRootScript
             Object.CalcRelTransform(self, self, relpos, relfac,
                 4 /* RelSubPhysModel */, 1 /* PLAYER_FOOT */);
             local footpos = Object.ObjectToWorld(self, -relpos);
-            spawnpos = footpos+vector(0,0,radius+0.05);
+            Object.CalcRelTransform(self, self, relpos, relfac,
+                4 /* RelSubPhysModel */, 0 /* PLAYER_HEAD */);
+            local headpos = Object.ObjectToWorld(self, -relpos);
+            spawnpos = vector(headpos.x,headpos.y,footpos.z)+vector(0,0,radius+0.05);
         } else {
             spawnpos = Camera.GetPosition()-vector(0,0,ROLL_SPINNER_OFFSETZ+Roll.ROLL_CAMERA_OFFSETZ+0.25);
         }
@@ -939,7 +965,7 @@ class RollStuntDouble extends SqRootScript
         
         local relpos = vector();
         local relfac = vector();
-        Object.CalcRelTransform("Player", self, relpos, relfac, 4 /* RelSubPhysModel */, 0 /* Head */);
+        Object.CalcRelTransform("Player", self, relpos, relfac, 4 /* RelSubPhysModel */, 0 /* PLAYER_HEAD */);
 
         local anchor = Object.BeginCreate("fnord");
         try {
