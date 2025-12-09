@@ -25,8 +25,6 @@
 // BUG: in game exe, roll bind does not function!
 // BUG: in game exe, didnt take fall damage, despite no roll!
 // TODO: use Debug.Log() for logging in game exe (goes into dromed.log/thief.log)
-// BUG: collision sound when rolling through doorway with open door :(
-// BUG: collision sound when arrow hits stunt double.
 // FEELS BAD: cant roll onto low (<=2 high) step.
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
@@ -1096,14 +1094,6 @@ class RollStuntDouble extends SqRootScript
                 ClearData("PlayLandingSound");
 
                 local tags = "Event Footstep, CreatureType Player";
-                if (Property.Possessed(message().collObj, "Material Tags")) {
-                    tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
-                }
-                Sound.PlayEnvSchema(0, tags, self, 0, eEnvSoundLoc.kEnvSoundAtObjLoc);
-            }
-        } else {
-            if (message().collType==ePhysCollisionType.kCollObject) {
-                local tags = "Event Collision, CreatureType StuntDouble";
                 if (Property.Possessed(message().collObj, "Material Tags")) {
                     tags += ", "+Property.Get(message().collObj, "Material Tags", "1: Tags");
                 }
