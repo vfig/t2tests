@@ -25,14 +25,10 @@
 // BUG: in game exe, roll bind does not function!
 // BUG: in game exe, didnt take fall damage, despite no roll!
 // TODO: use Debug.Log() for logging in game exe (goes into dromed.log/thief.log)
-// BUG: can roll through guards!
-// BUG: cant initiate roll when standing in doorway.
-// BUG? maybe cant roll through 3.5x7 doorway??
-// QUERY: can we do two player-radius sphere models on StuntDouble, with
-//        submodel 1 sitting higher? might need Rotation controls on StuntDouble.
 // BUG: collision sound when rolling through doorway with open door :(
 // BUG: collision sound when arrow hits stunt double.
-// BUG: player physics is wonky after rolling? tripping on bodies, shoving pool gear around... wrong collision type or what?
+// FEELS BAD: roll while leaning doesnt side roll.
+// FEELS BAD: cant roll onto low (<=2 high) step.
 
 PRJ_FLG_ZEROVEL <-  (1 << 0);  // ignore launcher velocity
 PRJ_FLG_PUSHOUT <-  (1 << 1);  // push away from launcher
@@ -106,7 +102,10 @@ class Roll extends SqRootScript
     static ROLL_DAMAGE_REDUCTION = 6.0;         // How much a roll subtracts from incoming fall damage.
     static ROLL_VELOCITY_TRANSFER = 0.6;        // How much fall speed is transferred to a landing roll.
     static ROLL_MINIMUM_FORWARD_SPACE = 6.0;    // Can't roll forward with less space than this.
-    static ROLL_CAMERA_OFFSETZ = 1.25;
+    static ROLL_SPINNER_OFFSETZ = 0.7;          // Height of spinner above double origin.
+    static ROLL_CAMERA_OFFSETZ = 1.25;          // Height of camera above spinner origin.
+    static ROLL_PHYSCAST_OFFSETZ = 1.5;         // Height of 1st physcast above spinner origin.
+    static ROLL_PHYSCAST2_OFFSETZ = 2.4;       // Height of 2nd physcast above spinner origin.
 
     m_footContacts = null; // Foot tracks terrain and object contacts.
     m_shinContacts = null; // Shin tracks only object contacts (for sphere hats mostly).
@@ -434,7 +433,7 @@ class Roll extends SqRootScript
             local footpos = Object.ObjectToWorld(self, -relpos);
             spawnpos = footpos+vector(0,0,radius+0.05);
         } else {
-            spawnpos = Camera.GetPosition()-vector(0,0,Roll.ROLL_CAMERA_OFFSETZ+0.25);
+            spawnpos = Camera.GetPosition()-vector(0,0,ROLL_SPINNER_OFFSETZ+Roll.ROLL_CAMERA_OFFSETZ+0.25);
         }
 
         // Do raycasts forward/left/right/back see if there is enough room for
@@ -447,10 +446,14 @@ class Roll extends SqRootScript
         local worldYDir = worldXDir.Cross(vector(0,0,1));
 
         // Check if physcasts report enough room.
-        vpos.x = HackPhysRaycast(spawnpos, worldXDir, raycastLength, null, true, false);
-        vneg.x = HackPhysRaycast(spawnpos, -worldXDir, raycastLength, null, true, false);
-        vpos.y = HackPhysRaycast(spawnpos, worldYDir, raycastLength, null, true, false);
-        vneg.y = HackPhysRaycast(spawnpos, -worldYDir, raycastLength, null, true, true);
+        local castpos = spawnpos+vector(0,0,ROLL_PHYSCAST_OFFSETZ);
+        local castpos2 = spawnpos+vector(0,0,ROLL_PHYSCAST2_OFFSETZ);
+        local x1 = HackPhysRaycast(castpos, worldXDir, raycastLength, null, true, false);
+        local x2 = HackPhysRaycast(castpos2, worldXDir, raycastLength, null, true, false);
+        if (x1<x2) vpos.x = x1; else vpos.x = x2;
+        vneg.x = HackPhysRaycast(castpos, -worldXDir, raycastLength, null, true, false);
+        vpos.y = HackPhysRaycast(castpos, worldYDir, raycastLength, null, true, false);
+        vneg.y = HackPhysRaycast(castpos, -worldYDir, raycastLength, null, true, true);
 
         if (DEBUG_LOG_PHYSCAST) {
             print(message().message
@@ -706,7 +709,7 @@ class Roll extends SqRootScript
         velxy += (forward*boost)
         print("Roll: boost mag:"+velxy.Length());
 
-        local didRoll = DoRoll(velxy, false, false);
+        local didRoll = DoRoll(velxy, true, false);
 
         if (didRoll) {
             local tags = "Event Footstep, CreatureType Player";
@@ -914,7 +917,7 @@ class RollStuntDouble extends SqRootScript
         if (DEBUG_VISIBLEPARTS)
             Property.SetSimple(spinner, "RenderType", 0); // Normal
         local link = Link.Create("DetailAttachement", spinner, self);
-        LinkTools.LinkSetData(link, "rel pos", vector());
+        LinkTools.LinkSetData(link, "rel pos", vector(0,0,Roll.ROLL_SPINNER_OFFSETZ));
         LinkTools.LinkSetData(link, "rel rot", vector());
         Property.Add(spinner, "CfgTweqJoints");
         if (DEBUG_NODESTROY)
